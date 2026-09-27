@@ -1,0 +1,62 @@
+<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width"><title>ettin check</title>
+<pre id=o style="white-space:pre-wrap;font-size:11px"></pre>
+<script type=module>
+// Compares the phone's forward pass, gradients and one AdamW step with PyTorch's (ref.json).
+import { init, defaultDevice, getWebGPUDevice, jit, numpy as np, tree } from "./lib/jax/index.js";
+import * as E from "./ettin.js";
+const say = E.logger("check");
+const maxAbs = (a, b) => a.reduce((m, x, i) => Math.max(m, Math.abs(x - b[i])), 0);
+const rel = (a, b) => Math.abs(a - b) / Math.max(Math.abs(b), 1e-12);
+try {
+  say("backends " + (await init("webgpu")).join(","));
+  defaultDevice(new URLSearchParams(location.search).get("dev") || "webgpu");
+  const gpu = await getWebGPUDevice();
+  gpu.lost.then((i) => say(`GPU LOST: reason=${i.reason} message=${i.message}`));
+  gpu.onuncapturederror = (e) => say(`GPU ERROR: ${e.error.message}`);
+  const [data, ref] = await Promise.all([E.loadData(), fetch("data/ref.json").then(r => r.json())]);
+  const P0 = await E.loadWeights("data", data.vocab);
+  let P = P0;
+  say(`loaded; ref lengths ${ref.lengths}`);
+  const fwd = jit(E.forward);
+
+  let t = performance.now();
+  let { batch } = E.makeBatch(data, "train", ref.rows);
+  const logits = await fwd(tree.ref(P), batch).data();
+  const refL = ref.logits.flat();
+  say(`forward ${(performance.now() - t).toFixed(0)} ms: max |logit diff| ${maxAbs(logits, refL).toExponential(2)} (logits up to ${Math.max(...refL.map(Math.abs)).toFixed(2)})`);
+  for (let r = 0; r < ref.rows.length; r++)
+    say(`  row ${r} (len ${ref.lengths[r]}): max diff ${maxAbs(logits.slice(r * 77, r * 77 + 77), ref.logits[r]).toExponential(2)}`);
+
+  t = performance.now();
+  const g = jit(E.lossAndGrad);
+  let mb = E.makeBatch(data, "train", ref.rows);
+  const [loss, G] = g(tree.ref(P), mb.batch, mb.yoh, mb.w);
+  const lossV = (await loss.data())[0];
+  const norm = async (x) => Math.sqrt((await E.sumSq(x).data())[0]);
+  let total = 0; const norms = {};
+  for (const k in G) { norms[k] = await norm(G[k].ref); total += norms[k] ** 2; }
+  say(`loss+grad ${(performance.now() - t).toFixed(0)} ms: loss ${lossV.toFixed(5)} vs ${ref.loss.toFixed(5)}; grad norm ${Math.sqrt(total).toFixed(4)} vs ${ref.grad_norm.toFixed(4)}`);
+  const pairs = {
+    "classifier.weight": ["cls_w"], "classifier.bias": ["cls_b"], "head.dense.weight": ["head_dense"],
+    "model.layers.0.attn.Wqkv.weight": ["L0.Wq", "L0.Wk", "L0.Wv"], "model.layers.1.attn.Wqkv.weight": ["L1.Wq", "L1.Wk", "L1.Wv"],
+    "model.layers.4.mlp.Wi.weight": ["L4.Wi_in", "L4.Wi_gate"], "model.embeddings.tok_embeddings.weight": ["emb"] };
+  for (const [name, ks] of Object.entries(pairs)) {
+    const n = Math.sqrt(ks.reduce((s, k) => s + norms[k] ** 2, 0));
+    const first = Array.from((await G[ks[0]].ref.data()).slice(0, 6));
+    say(`  ${name}: norm rel err ${rel(n, ref.grads[name].norm).toExponential(1)}; first-6 max diff ${maxAbs(first, ref.grads[name].first).toExponential(1)}`);
+  }
+  tree.dispose(G);
+
+  t = performance.now();
+  const M = E.zerosLike(P), V = E.zerosLike(P);
+  mb = E.makeBatch(data, "train", ref.rows);
+  const out = E.trainStep(P, M, V, mb.batch, mb.yoh, mb.w, E.hyper(1e-4, 1));
+  P = out.P; await out.loss.data();
+  say(`train step ${(performance.now() - t).toFixed(0)} ms (first call includes compiling)`);
+  ({ batch } = E.makeBatch(data, "train", ref.rows));
+  const after = await fwd(tree.ref(P), batch).data();
+  const refA = ref.logits_after_adamw_step.flat();
+  say(`after one AdamW step: max |logit diff| ${maxAbs(after, refA).toExponential(2)}; logits moved by ${maxAbs(refA, refL).toFixed(3)} in PyTorch`);
+  say("DONE");
+} catch (e) { say("ERROR " + (e.stack || e)); }
+</script>

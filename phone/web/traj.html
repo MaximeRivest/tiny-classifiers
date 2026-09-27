@@ -1,0 +1,25 @@
+<!doctype html><meta charset=utf-8><title>trajectory check</title><pre id=o></pre>
+<script type=module>
+// Replays the PyTorch reference trajectory (data/traj.json) step by step and compares loss and grad norm.
+import { init, defaultDevice, getWebGPUDevice } from "./lib/jax/index.js";
+import * as E from "./ettin.js";
+const say = E.logger("traj");
+try {
+  await init("webgpu"); defaultDevice("webgpu");
+  const gpu = await getWebGPUDevice(); gpu.lost.then((i) => say(`GPU LOST: ${i.message}`));
+  const [data, ref] = await Promise.all([E.loadData(), fetch("data/traj.json").then((r) => r.json())]);
+  let P = await E.loadWeights("data", data.vocab), M = E.zerosLike(P), V = E.zerosLike(P);
+  let worst = 0;
+  for (let t = 0; t < ref.batches.length; t++) {
+    const mb = E.makeBatch(data, "train", ref.batches[t], 32);
+    const o = E.trainStep(P, M, V, mb.batch, mb.yoh, mb.w, E.hyper(ref.lr, t + 1));
+    P = o.P; M = o.M; V = o.V;
+    const l = (await o.loss.data())[0], g = (await o.gnorm.data())[0];
+    const el = Math.abs(l - ref.loss[t]) / Math.abs(ref.loss[t]), eg = Math.abs(g - ref.grad_norm[t]) / ref.grad_norm[t];
+    worst = Math.max(worst, el);
+    say(`step ${t + 1} len ${mb.L}: loss ${l.toFixed(4)} vs ${ref.loss[t].toFixed(4)} (rel ${el.toExponential(1)}), grad norm ${g.toFixed(3)} vs ${ref.grad_norm[t].toFixed(3)} (rel ${eg.toExponential(1)})`);
+  }
+  say(`worst loss rel err ${worst.toExponential(2)}`);
+} catch (e) { say("ERROR " + (e.stack || e)); }
+say("END");
+</script>

@@ -1,0 +1,866 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tiny classifiers: the long version</title>
+<link rel="stylesheet" href="film.css">
+</head>
+<body>
+<div id="stage">
+
+  <div class="scene dark" id="s-hook">
+    <div id="hk-left">
+      <div id="hk-kick">The long version · how to do it yourself</div>
+      <div class="hk-l" id="hk-l1">A <em>17M</em> model<i></i></div>
+      <div class="hk-l" id="hk-l2">trained in <em>42 s</em><i></i></div>
+      <div class="hk-l" id="hk-l3">≈ <em>Claude Opus</em><i></i></div>
+      <div id="hk-sub">Sorting bank messages into 77 categories.</div>
+      <div id="hk-chips"><span><b>5 ms</b> per message</span><span><b>≈ $0</b> per million</span><span>trains on a <b>phone</b></span></div>
+    </div>
+    <div class="card" id="hk-chart" style="left:960px;top:190px;width:880px;height:680px"></div>
+    <div id="hk-bubbles"></div>
+    <div id="hk-title"><div class="t">The long version</div><div class="s">Fine-tuning and distilling tiny classifiers:<br>what we measured, and how to do it yourself.</div><div class="by">Maxime Rivest</div></div>
+  </div>
+
+  <div class="scene" id="s-job">
+    <div class="chap">01 · The job</div>
+    <div class="head" id="jb-head">Sort every message into the right box</div>
+    <div id="jb-msgs"></div>
+    <div id="jb-grid"></div>
+    <svg id="jb-svg" width="1920" height="1080"></svg>
+    <div id="jb-label"></div>
+    <div class="lbl a" id="jb-gl" style="left:1040px;top:292px">77 categories</div>
+    <div id="jb-chips"></div>
+  </div>
+
+  <div class="scene" id="s-ways">
+    <div class="chap">02 · Three ways</div>
+    <div class="head">Three ways to get a classifier</div>
+    <div class="card way" id="wy1" style="left:140px"><div class="no">1</div><h3>Ask a frontier AI</h3><div class="ex">Claude Opus · Kimi K3</div>
+      <div class="pt"><b class="y">✓</b>Very smart</div><div class="pt"><b class="n">✗</b>0.5 to 2.4 s per answer</div><div class="pt"><b class="n">✗</b>You pay for every answer</div></div>
+    <div class="card way" id="wy2" style="left:710px"><div class="no">2</div><h3>A classification API</h3><div class="ex">Jev</div>
+      <div class="pt"><b class="y">✓</b>Give it your categories</div><div class="pt"><b class="y">✓</b>0.12 s per answer</div><div class="pt"><b class="y">✓</b>No training at all</div></div>
+    <div class="card way" id="wy3" style="left:1280px"><div class="no">3</div><h3>Train your own tiny model</h3><div class="ex">Ettin · BERT</div>
+      <div class="pt"><b class="q">?</b>Used to take days</div><div class="pt"><b class="q">?</b>Needs labelled data</div><div class="pt"><b class="q">?</b>What does it take now?</div></div>
+  </div>
+
+  <div class="scene" id="s-result">
+    <div class="chap">03 · The experiment</div>
+    <div class="head">banking77: a 17M model against frontier AI</div>
+    <div class="card" id="rs-data" style="left:140px;top:225px;width:760px;height:170px;padding:30px 36px">
+      <div class="lbl">Dataset · public</div>
+      <div style="font:800 40px var(--mono);margin-top:12px">banking77</div>
+      <div style="font:400 24px var(--sans);color:var(--muted);margin-top:8px">≈10,000 bank messages · 77 categories · labelled by people</div>
+    </div>
+    <div class="card" id="rs-gpu" style="left:960px;top:225px;width:820px;height:170px;padding:30px 36px">
+      <div class="lbl">Fine-tuning Ettin (17M) · one RTX 3090 from 2020</div>
+      <div style="display:flex;align-items:center;margin-top:26px;gap:28px">
+        <div style="position:relative;flex:1;height:26px;border-radius:13px;background:rgba(20,32,26,.07)"><div id="rs-pbar" style="position:absolute;left:0;top:0;bottom:0;border-radius:13px;background:var(--green)"></div></div>
+        <div id="rs-sec" style="font:800 60px var(--mono);width:190px;text-align:right;color:var(--green)">0 s</div>
+      </div>
+    </div>
+    <div id="rs-tab"></div>
+    <div class="foot">Tested on 3,076 messages none of the models had seen (Opus and Kimi: 200 of them, ±2–3 points). Cost = price to classify one million messages; the fine-tuned model runs on one gaming GPU.</div>
+  </div>
+
+  <div class="scene" id="s-ettin">
+    <div class="chap">04 · The model</div>
+    <div class="head">Ettin: a tiny reader, not a writer</div>
+    <div id="et-badges"></div>
+    <div id="et-block"><div class="n">Ettin encoder · 17M</div><div class="d">reads every word at once, in both directions</div></div>
+    <svg id="et-svg" width="1920" height="1080"></svg>
+    <div id="et-toks"></div>
+    <div class="lbl a" id="et-hl" style="left:1060px;top:300px">one score per category (77)</div>
+    <div class="a" id="et-top" style="left:1060px;top:644px;font:700 30px var(--mono);color:var(--green)">card_arrival · 94%</div>
+    <div class="code" id="et-code" style="left:140px;top:712px;width:1180px"><span class="k">from</span> transformers <span class="k">import</span> AutoModelForSequenceClassification
+model = AutoModelForSequenceClassification.from_pretrained(
+    <span class="s">"jhu-clsp/ettin-encoder-17m"</span>, num_labels=<span class="s">77</span>)
+<span class="c"># train every weight · AdamW, lr 1e-4 · batch 32 · 6 passes</span></div>
+    <div id="et-chips"></div>
+  </div>
+
+  <div class="scene" id="s-anywhere">
+    <div class="chap">05 · Anywhere</div>
+    <div class="head">No GPU? Train it on your laptop, or your phone.</div>
+    <div class="colhead" style="left:236px;top:282px">Trained on</div>
+    <div class="colhead" style="left:716px;top:282px">Training time</div>
+    <div class="colhead" style="left:976px;top:282px">% of answers right</div>
+    <div class="colhead" style="right:140px;top:282px">Per message</div>
+    <div id="an-rows"></div>
+    <div id="an-note" class="a" style="left:976px;top:800px;font:600 26px var(--sans);color:var(--green)"></div>
+    <div class="foot">Same 17M model, same recipe, same 9,493 examples. Laptop: 2019 Intel i7, 4 cores, no GPU. Phone: Galaxy S21 Ultra’s GPU, in Chrome (WebGPU + jax-js), plugged in. Per message: timed on the device.</div>
+  </div>
+
+  <div class="scene" id="s-curve">
+    <div class="chap">06 · The catch</div>
+    <div id="cv-big" class="a" style="left:0;right:0;top:370px;text-align:center;font:800 84px/1.25 var(--mono);letter-spacing:-.03em"><div id="cv-b1">The model is the easy part.</div><div id="cv-b2" style="color:var(--green)">The labels are the whole game.</div></div>
+    <div class="head" id="cv-head">More labels, better model</div>
+    <svg id="cv-svg" width="1920" height="1080"></svg>
+    <div class="foot" id="cv-foot">banking77, human labels. Each point is a model fine-tuned on that many examples, tested on 3,076 messages. Sizes: BERT-tiny 4M, Ettin 17M/32M/68M, ModernBERT 150M/395M, Qwen3.5 0.8B.</div>
+  </div>
+
+  <div class="scene" id="s-distill">
+    <div class="chap">07 · Distillation</div>
+    <div class="head">No labels? Borrow a teacher.</div>
+    <svg id="ds-svg" width="1920" height="1080"></svg>
+    <div id="ds-cards"></div>
+    <div class="circ" id="ds-teacher" style="left:780px;top:300px;width:360px;height:360px;background:#14201a;color:#eef4f0"><div><div style="font:800 46px var(--mono)">Kimi K3</div><div class="lbl" style="color:#62d3a8;margin-top:10px">teacher</div></div></div>
+    <div class="circ" id="ds-student" style="left:1500px;top:390px;width:180px;height:180px;background:var(--green);color:#fff"><div><div style="font:800 30px var(--mono)">Ettin</div><div style="font:600 18px var(--mono);margin-top:4px">17M · student</div></div></div>
+    <div id="ds-provs"></div>
+    <div id="ds-word" class="a" style="left:1150px;top:620px;width:480px;text-align:center;font:italic 400 44px var(--serif);color:var(--green)">distillation</div>
+    <div id="ds-stats"></div>
+    <div class="card" id="ds-terms"><div class="lbl" style="margin-bottom:22px">Before you start: may you train on the teacher’s answers?</div>
+      <div class="trow" id="ds-t1"><i style="color:var(--green)">✓</i>Kimi K3<span>allowed (via OpenRouter)</span></div>
+      <div class="trow" id="ds-t2"><i style="color:var(--jev-ink)">✗</i>Claude Opus<span>not allowed</span></div>
+      <div class="trow" id="ds-t3"><i style="color:var(--jev-ink)">✗</i>Jev<span>not allowed</span></div>
+      <div style="font:400 21px var(--sans);color:var(--faint);margin-top:26px">Terms as I read them for these tests. Check your teacher’s terms for your own use.</div>
+    </div>
+  </div>
+
+  <div class="scene" id="s-ceiling">
+    <div class="chap">08 · The ceiling</div>
+    <div class="head">A student lands just under its teacher</div>
+    <svg id="ce-svg" width="1920" height="1080"></svg>
+    <div class="foot">Ettin-17M on banking77: the same messages, labelled by people or by Kimi K3. Mean of 3 runs; tested on 3,076 messages with human labels.</div>
+  </div>
+
+  <div class="scene" id="s-soft">
+    <div class="chap">09 · Probabilities</div>
+    <div class="head">Copy the teacher’s answer, or its probabilities?</div>
+    <div id="sf-q" class="a" style="left:140px;top:206px;font:500 24px var(--sans);color:var(--muted)">The teacher, on “How do I locate my card?”</div>
+    <div class="scol" id="sf-l" style="left:140px"><h3>Answer only</h3><div id="sf-lb"></div></div>
+    <div class="scol" id="sf-r" style="left:1020px"><h3>Probabilities</h3><div id="sf-rb"></div></div>
+    <div id="sf-rows"></div>
+    <div class="foot">Ettin-17M on banking77, all 9,493 messages; only the training target differs. Mean of 3 runs, tested on 3,076 messages. Probabilities in the example are illustrative.</div>
+  </div>
+
+  <div class="scene" id="s-general">
+    <div class="chap">10 · Ten tasks</div>
+    <div class="head">Same recipe, ten tasks</div>
+    <div class="legend" id="gn-leg"></div>
+    <svg id="gn-svg" width="1920" height="1080"></svg>
+    <div id="gn-count" class="a" style="left:140px;top:206px;font:600 26px var(--sans);color:var(--ink2)"></div>
+    <div class="foot">Ettin-17M, one recipe for all, mean of 3 runs, up to 150 examples per category. Test sets: 500 to 3,076 messages (±1.5–2 points). Hate speech: insults toward women are “hate” 68% of the time in training, 42% in the test set.</div>
+  </div>
+
+  <div class="scene" id="s-pays">
+    <div class="chap">11 · When it pays</div>
+    <div class="head">When does fine-tuning pay for itself?</div>
+    <svg id="py-svg" width="1920" height="1080"></svg>
+    <div id="py-chips"></div>
+    <div class="foot">banking77 shown: Kimi K3 labels $14.34, training 44 s on a rented RTX 3090 ($0.12/h); Jev at its measured $43 per million. Across the ten tasks: break-even after 55k–504k messages in money, 44k–534k in time.</div>
+  </div>
+
+  <div class="scene dark" id="s-twist">
+    <div class="chap">12 · The twist</div>
+    <div id="tw-quote">“To ensure it works reliably, you need evaluation. To evaluate, you need datasets. Once you have those, wouldn’t it be more optimal to train a specialized model?”<small>A reply to the post · @maxinel_ai</small></div>
+    <svg id="tw-svg" width="1920" height="1080"></svg>
+    <div id="tw-dia"></div>
+    <div class="card lang" id="tw-py" style="left:140px"><div class="t">Jev ≈ Python</div><div class="s">interpreted: run it now</div>
+      <div class="p">No build step, no data needed</div><div class="p">Perfect to start and to explore</div><div class="p">Pay a little on every call</div></div>
+    <div class="card lang" id="tw-rs" style="left:1060px"><div class="t" style="color:#62d3a8">Fine-tuned ≈ Rust</div><div class="s">compiled: build once, run forever</div>
+      <div class="p">Needs labels and a minute to build</div><div class="p">Faster, private, runs offline</div><div class="p">Almost free per call</div></div>
+    <div id="tw-line" class="a" style="left:0;right:0;top:860px;text-align:center;font:italic 400 52px var(--serif);color:#eef4f0">Start in Python. Compile what proves it needs to scale.</div>
+  </div>
+
+  <div class="scene" id="s-recipe">
+    <div class="chap">13 · The recipe</div>
+    <div class="head">How to do it yourself</div>
+    <div id="rc-steps"></div>
+  </div>
+
+  <div class="scene" id="s-close">
+    <div id="cl-a" style="top:350px">Evaluate first.</div>
+    <div id="cl-b" style="top:500px">Fine-tune what pays.</div>
+    <div id="cl-by">Maxime Rivest · @MaximeRivest<small>banking77 and nine other public datasets · Ettin: jhu-clsp/ettin-encoder-17m · teacher: Kimi K3</small></div>
+  </div>
+
+  <div id="cap"><span id="cap-in"></span></div>
+  <div id="prog"></div>
+  <div id="veil"></div>
+</div>
+
+<script src="script.js"></script>
+<script src="work/vo/durations.js"></script>
+<script src="work/vo/words.js"></script>
+<script src="timeline.js"></script>
+<script>
+const { SCENES, L, at, OVERLAP } = TL;
+const SCRIPT = window.SCRIPT, WORDS = window.WORDS;
+const DUR = TL.duration;
+const $ = s => document.querySelector(s);
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const P = (t, a, b) => clamp((t - a) / (b - a));
+const lerp = (a, b, x) => a + (b - a) * x;
+const E = {
+  out: x => 1 - (1 - x) ** 3, out5: x => 1 - (1 - x) ** 5,
+  inOut: x => x < .5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2,
+  back: x => { const c1 = 1.6, c3 = c1 + 1; return 1 + c3 * (x - 1) ** 3 + c1 * (x - 1) ** 2; },
+};
+const NS = 'http://www.w3.org/2000/svg';
+function el(tag, cls, parent, html, style) {
+  const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html;
+  if (style) Object.assign(e.style, style); parent.appendChild(e); return e;
+}
+function S(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e;
+}
+// Appear at t0: fade + rise (dy) or slide (dx) + optional scale; optional exit at `out`.
+function show(e, t, t0, o = {}) {
+  const { d = .6, dy = 26, dx = 0, s = 0, out = null, od = .45, ease = E.out } = o;
+  const p = ease(P(t, t0, t0 + d)), q = out == null ? 0 : E.inOut(P(t, out, out + od));
+  e.style.opacity = (p * (1 - q)).toFixed(4);
+  const sc = s ? 1 - s * (1 - p) : 1;
+  e.style.transform = `translate(${(dx * (1 - p)).toFixed(2)}px,${(dy * (1 - p) - (o.rise || 0) * q).toFixed(2)}px) scale(${sc.toFixed(4)}) rotate(.01deg)`;
+  return p * (1 - q);
+}
+const fmtInt = n => Math.round(n).toLocaleString('en-US');
+const ICON = {
+  gpu: '<svg width="64" height="48" viewBox="0 0 64 48" style="position:static"><rect x="3" y="8" width="58" height="28" rx="5" fill="none" stroke="#14201a" stroke-width="3.5"/><circle cx="22" cy="22" r="8" fill="none" stroke="#14201a" stroke-width="3.5"/><circle cx="42" cy="22" r="8" fill="none" stroke="#14201a" stroke-width="3.5"/><path d="M10 36v7M17 36v7M24 36v7" stroke="#14201a" stroke-width="3.5"/></svg>',
+  laptop: '<svg width="64" height="48" viewBox="0 0 64 48" style="position:static"><rect x="10" y="6" width="44" height="28" rx="3" fill="none" stroke="#14201a" stroke-width="3.5"/><path d="M3 41h58" stroke="#14201a" stroke-width="4.5" stroke-linecap="round"/></svg>',
+  phone: '<svg width="64" height="56" viewBox="0 0 64 56" style="position:static"><rect x="18" y="2" width="28" height="52" rx="5" fill="none" stroke="#14201a" stroke-width="3.5"/><path d="M28 46h8" stroke="#14201a" stroke-width="3.5" stroke-linecap="round"/></svg>',
+};
+
+/* ================= data ================= */
+const B77 = [ // name, sub, accuracy, green?, cost / 1M, per message
+  ['Ettin (17M)', 'fine-tuned, 42 s', 91.5, true, '≈ $0', '5 ms'],
+  ['Claude Opus 5.5', 'frontier AI', 92.0, false, '$8,120', '2.4 s'],
+  ['Kimi K3', 'frontier AI', 82.0, false, '$1,540', '0.5 s'],
+  ['Jev', 'classification API', 79.4, false, '$43', '0.12 s'],
+];
+const CURVES = { // banking77, human labels: [rows, accuracy]
+  'BERT-tiny': [[100, 24.7], [250, 41.6], [500, 57.1], [1000, 70.4], [2000, 80.5], [4000, 85.1], [9493, 89.2]],
+  'Ettin 32M': [[100, 17.0], [250, 30.8], [500, 49.6], [1000, 67.8], [2000, 83.0], [4000, 88.8], [9493, 92.5]],
+  'Ettin 68M': [[100, 18.8], [250, 34.8], [500, 55.2], [1000, 73.3], [2000, 85.2], [4000, 90.3], [9493, 93.2]],
+  'ModernBERT-base': [[100, 18.6], [250, 32.9], [500, 55.8], [1000, 74.2], [2000, 85.5], [4000, 90.0], [9493, 93.2]],
+  'ModernBERT-large': [[100, 23.8], [250, 36.9], [500, 62.6], [1000, 79.4], [2000, 88.8], [4000, 91.7], [9493, 94.2]],
+  'Qwen3.5 0.8B': [[100, 25.5], [250, 41.6], [500, 59.6], [1000, 77.0], [2000, 86.4], [4000, 90.4], [9493, 93.8]],
+  'Ettin 17M': [[100, 14.6], [250, 27.1], [500, 44.7], [1000, 66.7], [2000, 81.0], [4000, 87.2], [9493, 91.5]],
+};
+const KIMI_CURVE = [[100, 14.8], [250, 25.9], [500, 43.2], [1000, 61.3], [2000, 72.2], [4000, 77.0], [9493, 79.5]];
+const TASKS = [ // name, detail, kimi, jev, human, distilled, gap (distilled - jev)
+  ['LEDGAR', 'legal clauses, 100', 78.5, 76.0, 83.4, 76.3, 0.3],
+  ['banking77', 'bank intents, 77', 81.6, 79.4, 91.5, 79.5, 0.1],
+  ['MASSIVE EN', 'assistant, 60', 86.4, 82.3, 85.0, 80.4, -1.9],
+  ['MASSIVE FR', 'assistant, 60', 86.0, 80.0, 79.4, 78.0, -2.0],
+  ['AG News', 'topics, 4', 87.4, 87.0, 87.3, 84.8, -2.2],
+  ['FinPhraseBank', 'finance mood, 3', 81.5, 78.6, 79.3, 75.3, -3.2],
+  ['CLINC150', 'assistant, 151', 91.1, 88.2, 85.2, 83.5, -4.7],
+  ['TREC', 'question types, 50', 77.4, 84.2, 89.9, 73.9, -10.3],
+  ['Hate speech', 'tweets, 2', 71.3, 75.0, 49.0, 58.3, -16.7],
+  ['SST-5', 'sentiment, 5', 53.8, 59.3, 36.2, 39.4, -19.9],
+];
+
+/* ================= 1. hook ================= */
+// Frame 0 is the thumbnail: headline + the chart of the most-viewed post, all fully drawn.
+const RUN = {};
+{
+  const card = $('#hk-chart');
+  el('div', null, card, 'banking77 · % of answers right', { position: 'absolute', left: '46px', top: '40px', font: '600 22px var(--mono)', letterSpacing: '.08em', color: '#7f9187', textTransform: 'uppercase' });
+  el('div', null, card, 'Tested on 3,076 bank messages the models never saw', { position: 'absolute', left: '46px', top: '76px', font: '400 22px var(--sans)', color: '#7f9187' });
+  const rows = [['ModernBERT', '150M · fine-tuned 77 s', 93.2, true], ['Claude Opus 5.5', 'frontier AI', 92.0, false], ['Ettin', '17M · fine-tuned 42 s', 91.5, true], ['Kimi K3', 'frontier AI', 82.0, false], ['Jev', 'classification API', 79.4, false]];
+  const TW = 470;
+  const R = rows.map((r, i) => {
+    const row = el('div', 'brow', card, null, { left: '46px', right: '46px', top: 140 + i * 104 + 'px', borderRadius: '14px' });
+    el('div', 'nm', row, `${r[0]}<small>${r[1]}</small>`, { width: '300px', fontSize: '31px' });
+    const tr = el('div', 'track', row, null, { width: TW + 'px', height: '58px' });
+    const f = el('div', 'fill' + (r[3] ? ' g' : ''), tr, null, Object.assign({ width: (r[2] / 100 * TW) + 'px' }, r[3] ? {} : { background: '#5c6a62' }));
+    el('div', 'val', f, r[2].toFixed(1) + '%', { lineHeight: '58px', fontSize: '30px' });
+    return { row, acc: r[2] };
+  });
+  const QS = [['how me do this', 110, 240, -4], ['what is ettin??', 60, 470, 3], ['does it hold once labels drift?', 40, 720, 2], ['data where?', 1480, 250, 3],
+    ['best against what?', 1450, 500, -3], ['how long did it take to get the data?', 1090, 900, -2], ['when does it pay off?', 700, 100, 2]];
+  const bub = QS.map(q => el('div', 'bubble', $('#hk-bubbles'), q[0], { left: q[1] + 'px', top: q[2] + 'px' }));
+  const lines = ['#hk-l1', '#hk-l2', '#hk-l3'].map(s => $(s)), unders = lines.map(l => l.querySelector('i'));
+  const TU = [L.h1.a, at('h1', 'Forty-two'), at('h2', 'Claude')];
+  const TC = L.h3.a - .2, TQ = at('h3', 'many of you'), TT = L.h4.a;
+  RUN.hook = t => {
+    // the headline is underlined as it is spoken, then leaves
+    const out = E.inOut(P(t, TC, TC + .7));
+    $('#hk-left').style.opacity = (1 - out).toFixed(4);
+    $('#hk-left').style.transform = `translateX(${(-60 * out).toFixed(2)}px) rotate(.01deg)`;
+    unders.forEach((u, i) => { u.style.width = (100 * E.out(P(t, TU[i], TU[i] + .7))).toFixed(2) + '%'; });
+    // Ettin and Opus rows light up on "Claude Opus"
+    const hi = E.inOut(P(t, TU[2], TU[2] + .5));
+    [1, 2].forEach(i => { R[i].row.style.background = `rgba(98,211,168,${(.10 * hi).toFixed(3)})`; });
+    // the chart glides to the centre, the questions pop around it
+    const mv = E.inOut(P(t, TC + .1, TC + 1.0));
+    const gone = E.inOut(P(t, TT - .5, TT));
+    card.style.transform = `translateX(${(-440 * mv).toFixed(2)}px) translateY(${(-30 * gone).toFixed(2)}px) rotate(.01deg)`;
+    card.style.opacity = (1 - gone).toFixed(4);
+    const span = L.h3.b - TQ;
+    bub.forEach((b, i) => { const t0 = TQ + span * i / QS.length; show(b, t, t0, { d: .45, dy: 18, s: .3, ease: E.back, out: TT - .5 }); b.style.transform += ` rotate(${QS[i][3]}deg)`; });
+    show($('#hk-title'), t, TT + .1, { dy: 30, d: .9 });
+  };
+}
+
+/* ================= 2. job ================= */
+{
+  const MSG = [['Where is my new card? It’s been a week.', 'card_arrival'], ['I lost my card yesterday.', 'lost_or_stolen_card'], ['My refund still isn’t showing.', 'Refund_not_showing_up'],
+    ['Atm took my card', 'card_swallowed'], ['Can I cancel my transaction?', 'cancel_transfer'], ['Do you have a top-up limit?', 'top_up_limits'], ['How do I delete my account?', 'terminate_account'],
+    ['I saw a payment I did not do', 'card_payment_not_recognised'], ['Are both Visa and Mastercard offered?', 'visa_or_mastercard'], ['There is an unauthorized fee.', 'card_payment_fee_charged'],
+    ['How do I add a card to the app?', 'card_linking'], ['My top up was denied in the app.', 'top_up_failed']];
+  const LABS = ['Refund_not_showing_up', 'activate_my_card', 'age_limit', 'apple_pay_or_google_pay', 'atm_support', 'automatic_top_up', 'balance_not_updated_after_bank_transfer', 'balance_not_updated_after_cheque_or_cash_deposit', 'beneficiary_not_allowed', 'cancel_transfer', 'card_about_to_expire', 'card_acceptance', 'card_arrival', 'card_delivery_estimate', 'card_linking', 'card_not_working', 'card_payment_fee_charged', 'card_payment_not_recognised', 'card_payment_wrong_exchange_rate', 'card_swallowed', 'cash_withdrawal_charge', 'cash_withdrawal_not_recognised', 'change_pin', 'compromised_card', 'contactless_not_working', 'country_support', 'declined_card_payment', 'declined_cash_withdrawal', 'declined_transfer', 'direct_debit_payment_not_recognised', 'disposable_card_limits', 'edit_personal_details', 'exchange_charge', 'exchange_rate', 'exchange_via_app', 'extra_charge_on_statement', 'failed_transfer', 'fiat_currency_support', 'get_disposable_virtual_card', 'get_physical_card', 'getting_spare_card', 'getting_virtual_card', 'lost_or_stolen_card', 'lost_or_stolen_phone', 'order_physical_card', 'passcode_forgotten', 'pending_card_payment', 'pending_cash_withdrawal', 'pending_top_up', 'pending_transfer', 'pin_blocked', 'receiving_money', 'request_refund', 'reverted_card_payment?', 'supported_cards_and_currencies', 'terminate_account', 'top_up_by_bank_transfer_charge', 'top_up_by_card_charge', 'top_up_by_cash_or_cheque', 'top_up_failed', 'top_up_limits', 'top_up_reverted', 'topping_up_by_card', 'transaction_charged_twice', 'transfer_fee_charged', 'transfer_into_account', 'transfer_not_received_by_recipient', 'transfer_timing', 'unable_to_verify_identity', 'verify_my_identity', 'verify_source_of_funds', 'verify_top_up', 'virtual_card_not_working', 'visa_or_mastercard', 'why_verify_identity', 'wrong_amount_of_cash_received', 'wrong_exchange_rate_for_cash_withdrawal'];
+  const GX = 1040, GY = 330, CW = 66, CH = 50;
+  const boxes = LABS.map((l, i) => el('div', 'box', $('#jb-grid'), null, { left: GX + (i % 11) * CW + 'px', top: GY + Math.floor(i / 11) * CH + 'px' }));
+  const svg = $('#jb-svg');
+  const t0 = at('j2', 'card arrival') - 1.0, t1 = at('j2', 'lost card') - 1.0, t2 = at('j2', 'refund') - 1.0;
+  const rest = L.j3.a - .4, restEnd = L.j3.b - .6;
+  const times = [t0, t1, t2]; for (let i = 3; i < MSG.length; i++) times.push(rest + (restEnd - rest) * (i - 3) / (MSG.length - 3) * (1 - .35 * (i - 3) / MSG.length));
+  const M = MSG.map((m, i) => {
+    const d = el('div', 'msg', $('#jb-msgs'), `<i>${'ABCDEFGHJKLMN'[i]}</i>${m[0]}`);
+    const idx = LABS.indexOf(m[1]); const b = boxes[idx];
+    const dot = S('circle', { r: 9, fill: 'var(--green)' }, svg);
+    return { d, idx, b, dot, t: times[i], lab: m[1] };
+  });
+  const label = $('#jb-label');
+  const chips = ['support tickets', 'emails', 'contracts', 'reviews'].map((c, i) => el('div', 'chip', $('#jb-chips'), c, { left: 1040 + [0, 250, 400, 590][i] + 'px', top: '850px' }));
+  const chipT = ['support', 'emails', 'contracts', 'reviews'].map(w => at('j3', w));
+  RUN.job = t => {
+    show($('#jb-head'), t, SCENES.job[0] + .2);
+    show($('#jb-gl'), t, SCENES.job[0] + .5);
+    boxes.forEach((b, i) => { b.style.opacity = P(t, SCENES.job[0] + .3 + i * .008, SCENES.job[0] + .7 + i * .008); b.style.background = '#e1e8e3'; b.style.transform = ''; });
+    let cur = null;
+    M.forEach((m, i) => {
+      // feed: newest at the top; older ones slide down
+      let off = 0; for (let j = i + 1; j < M.length; j++) off += E.out(P(t, M[j].t, M[j].t + .45)) * 106;
+      const y = 300 + off, p = E.out(P(t, m.t, m.t + .45));
+      m.d.style.top = y.toFixed(2) + 'px';
+      m.d.style.opacity = (p * clamp(1 - (off - 424) / 106)).toFixed(3);
+      m.d.style.transform = `translateX(${(-40 * (1 - p)).toFixed(2)}px) rotate(.01deg)`;
+      // the dot flies to its box
+      const fly = P(t, m.t + .35, m.t + .95), bx = GX + (m.idx % 11) * CW + 29, by = GY + Math.floor(m.idx / 11) * CH + 20;
+      const sx = 860, sy = y + 46 - off * 0; const e = E.inOut(fly);
+      m.dot.setAttribute('cx', lerp(sx, bx, e)); m.dot.setAttribute('cy', lerp(sy, by, e) - Math.sin(Math.PI * e) * 60);
+      m.dot.setAttribute('opacity', fly > 0 && fly < 1 ? 1 : 0);
+      if (t >= m.t + .95) { const g = P(t, m.t + .95, m.t + 1.1) * (1 - .55 * P(t, m.t + 1.4, m.t + 2.2)); m.b.style.background = `rgba(22,155,115,${(.25 + .75 * g).toFixed(3)})`; cur = m; }
+    });
+    label.textContent = cur ? '→ ' + cur.lab : '';
+    label.style.opacity = cur ? P(t, cur.t + .95, cur.t + 1.15) : 0;
+    chips.forEach((c, i) => show(c, t, chipT[i] - .1, { dy: 16, d: .4, s: .1, ease: E.back }));
+  };
+}
+
+/* ================= 3. ways ================= */
+{
+  const cards = ['#wy1', '#wy2', '#wy3'].map(s => $(s));
+  const T = [L.w1.a - .1, L.w2.a - .1, L.w3.a - .1];
+  RUN.ways = t => {
+    cards.forEach((c, i) => {
+      show(c, t, T[i], { dy: 50, d: .7 });
+      const pts = c.querySelectorAll('.pt');
+      pts.forEach((p, k) => show(p, t, T[i] + .6 + k * .35, { dy: 10, d: .4 }));
+    });
+    const hi = E.inOut(P(t, at('w3', 'So we measured'), at('w3', 'So we measured') + .6));
+    cards[2].style.borderColor = hi ? `rgba(22,155,115,${hi})` : '';
+    cards[2].style.boxShadow = `0 30px 70px rgba(20,32,26,.08), 0 0 0 ${(4 * hi).toFixed(2)}px rgba(22,155,115,${(.35 * hi).toFixed(3)})`;
+    cards[0].style.opacity *= 1 - .45 * hi; cards[1].style.opacity *= 1 - .45 * hi;
+  };
+}
+
+/* ================= 4. result ================= */
+{
+  const tab = $('#rs-tab'), X = 140, Y = 470, TW = 720;
+  el('div', 'colhead', tab, '% of answers right', { left: X + 330 + 'px', top: Y - 40 + 'px' });
+  const hc = el('div', 'colhead', tab, 'Cost / 1M messages', { left: X + 1100 + 'px', top: Y - 40 + 'px', width: '260px', textAlign: 'right' });
+  const hm = el('div', 'colhead', tab, 'Per message', { left: X + 1400 + 'px', top: Y - 40 + 'px', width: '240px', textAlign: 'right' });
+  const R = B77.map((r, i) => {
+    const row = el('div', 'brow', tab, null, { left: X + 'px', width: '1640px', top: Y + i * 100 + 'px' });
+    el('div', 'nm', row, `${r[0]}<small>${r[1]}</small>`);
+    const tr = el('div', 'track', row, null, { width: TW + 'px' });
+    const f = el('div', 'fill' + (r[3] ? ' g' : ''), tr);
+    const v = el('div', 'val', f, r[2].toFixed(1) + '%');
+    const c = el('div', 'col', row, r[4], { width: '310px', color: r[3] ? 'var(--green)' : '', fontWeight: r[3] ? 800 : 500 });
+    const m = el('div', 'col', row, r[5], { width: '300px', color: r[3] ? 'var(--green)' : '', fontWeight: r[3] ? 800 : 500 });
+    return { row, f, v, c, m, acc: r[2] };
+  });
+  const TB = [at('r3', 'ninety-one'), at('r3', 'Opus'), at('r3', 'Kimi'), at('r3', 'Jev')].map(x => x - .35);
+  const TR0 = at('r2', 'it took') - 1.4, TR1 = at('r2', 'forty-two');
+  const TCo = at('r4', 'Opus would cost'), TCt = at('r4', 'The tiny model'), TM = at('r4', 'five milliseconds') - .3;
+  RUN.result = t => {
+    show($('#rs-data'), t, L.r1.a - .1, { dy: 30 });
+    show($('#rs-gpu'), t, L.r2.a, { dy: 30 });
+    const g = E.inOut(P(t, TR0, TR1));
+    $('#rs-pbar').style.width = (100 * g).toFixed(2) + '%';
+    $('#rs-sec').textContent = Math.round(42 * g) + ' s';
+    R.forEach((r, i) => {
+      show(r.row, t, TB[i] - .2, { dy: 0, dx: -30, d: .5 });
+      r.f.style.width = (r.acc / 100 * TW * E.out5(P(t, TB[i], TB[i] + .9))).toFixed(2) + 'px';
+      r.v.style.opacity = P(t, TB[i] + .6, TB[i] + .9);
+      show(r.c, t, i === 0 ? TCt : i === 1 ? TCo : TCo + .5 + i * .15, { dy: 12, d: .4 });
+      show(r.m, t, TM + i * .12, { dy: 12, d: .4 });
+    });
+    show(hc, t, TCo - .1, { dy: 0 }); show(hm, t, TM - .1, { dy: 0 });
+  };
+}
+
+/* ================= 5. ettin ================= */
+{
+  const WORDS = ['Where', 'is', 'my', 'new', 'card', '?'];
+  const widths = WORDS.map(w => 34 + w.length * 20);
+  let x = 200; const toks = WORDS.map((w, i) => { const e = el('div', 'tok', $('#et-toks'), w, { left: x + 'px', width: widths[i] + 'px', top: '590px' }); const c = x + widths[i] / 2; x += widths[i] + 18; return { e, c }; });
+  const svg = $('#et-svg');
+  const arcs = [];
+  for (let i = 0; i < toks.length; i++) for (let j = i + 1; j < toks.length; j++) {
+    const a = toks[i].c, b = toks[j].c, h = 18 + (b - a) * .17;
+    const p = S('path', { d: `M${a} 584 C${a} ${584 - h},${b} ${584 - h},${b} 584`, fill: 'none', stroke: '#62d3a8', 'stroke-width': 2.5, opacity: .75 }, svg);
+    const len = p.getTotalLength(); p.setAttribute('stroke-dasharray', len); arcs.push({ p, len, k: arcs.length });
+  }
+  // arrow and 77 scores
+  const arrow = S('path', { d: 'M985 505 L1035 505 M1022 492 L1037 505 L1022 518', stroke: '#14201a', 'stroke-width': 4, fill: 'none', 'stroke-linecap': 'round' }, svg);
+  let seed = 7; const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+  const bars = []; for (let i = 0; i < 77; i++) {
+    const top = i === 12, h = top ? 280 : 6 + rnd() ** 3 * 34;
+    bars.push({ r: S('rect', { x: 1060 + i * 9.1, width: 6.5, y: 630, height: 0, rx: 2, fill: top ? 'var(--green)' : '#b9c7be' }, svg), h });
+  }
+  const badges = ['encoder · like BERT', 'open weights · Johns Hopkins', '17M parameters'].map((b, i) => el('div', 'tag', $('#et-badges'), b, { position: 'absolute', left: [140, 440, 860][i] + 'px', top: '220px' }));
+  const bT = [at('e1', 'encoder'), at('e1', 'released'), at('e1', 'released') + .6];
+  const chips = [['every weight trained', 'train every weight'], ['6 passes', 'Six passes'], ['no LoRA, no tricks', 'whole trick']].map((c, i) => ({ e: el('div', 'chip', $('#et-chips'), c[0], { left: '1380px', top: 712 + i * 66 + 'px' }), t: at('e3', c[1]) - .2 }));
+  RUN.ettin = t => {
+    badges.forEach((b, i) => show(b, t, bT[i], { dy: 14, d: .4 }));
+    show($('#et-block'), t, L.e1.a, { dy: 30 });
+    const TA = at('e2', 'reads the whole') - .2;
+    toks.forEach((k, i) => show(k.e, t, TA - .4 + i * .06, { dy: 14, d: .4 }));
+    arcs.forEach(a => { const p = E.inOut(P(t, TA + a.k * .05, TA + .7 + a.k * .05)); a.p.setAttribute('stroke-dashoffset', (a.len * (1 - p)).toFixed(2)); });
+    const TS = at('e2', 'one score') - .2;
+    arrow.setAttribute('opacity', P(t, TS - .3, TS));
+    show($('#et-hl'), t, TS, { dy: 10 });
+    bars.forEach((b, i) => { const p = E.out(P(t, TS + i * .01, TS + .5 + i * .01)); b.r.setAttribute('y', 630 - b.h * p); b.r.setAttribute('height', b.h * p); });
+    show($('#et-top'), t, TS + .8, { dy: 10 });
+    show($('#et-code'), t, L.e3.a, { dy: 40 });
+    chips.forEach(c => show(c.e, t, c.t, { dy: 14, d: .4, s: .1, ease: E.back }));
+  };
+}
+
+/* ================= 6. anywhere ================= */
+{
+  const rows = [['gpu', 'Gaming GPU', 'RTX 3090 (2020)', 42, 's', 91.5, '5 ms'], ['laptop', 'Laptop CPU', '2019 Intel i7, 4 cores', 11, 'min', 91.0, '14 ms'], ['phone', 'Phone GPU', 'Galaxy S21 Ultra, in Chrome', 21, 'min', 91.4, '39 ms']];
+  const R = rows.map((r, i) => {
+    const d = el('div', 'drow', $('#an-rows'), null, { top: 330 + i * 150 + 'px' });
+    el('div', 'ic', d, ICON[r[0]]);
+    el('div', 'nm', d, `${r[1]}<small>${r[2]}</small>`);
+    const tm = el('div', 'tm', d, '');
+    const tr = el('div', 'track', d); const f = el('div', 'fill', tr); const v = el('div', 'val', f, r[5].toFixed(1) + '%');
+    const ms = el('div', 'ms', d, r[6]);
+    return { d, tm, f, v, ms, r };
+  });
+  const T = [L.a1.a - .2, at('a2', 'eleven') - .2, at('a2', 'twenty-one') - .2];
+  const note = $('#an-note');
+  RUN.anywhere = t => {
+    R.forEach((o, i) => {
+      show(o.d, t, T[i], { dy: 0, dx: -30, d: .5 });
+      const c = E.out(P(t, T[i] + .1, T[i] + 1.1));
+      o.tm.textContent = Math.max(1, Math.round(o.r[3] * c)) + ' ' + o.r[4];
+      o.f.style.width = (o.r[5] / 100 * 520 * E.out5(P(t, T[i] + .3, T[i] + 1.2))).toFixed(2) + 'px';
+      o.v.style.opacity = P(t, T[i] + .9, T[i] + 1.2);
+      o.ms.style.opacity = P(t, T[i] + .6, T[i] + 1);
+    });
+    const tn = at('a3', 'nothing to host');
+    note.innerHTML = t < tn - .2 ? 'All within half a point of each other' : 'Nothing to host: the model is a 34 MB file that lives in your app';
+    show(note, t, t < tn - .2 ? L.a3.a : tn, { dy: 12, d: .45, out: t < tn - .2 ? tn - .5 : null, od: .3 });
+  };
+}
+
+/* ================= chart helpers ================= */
+const LX = r => 240 + (Math.log10(r) - 2) / (Math.log10(9493) - 2) * 1180; // 100 .. 9,493 rows on a log scale
+const LY = a => 830 - a * 5.4;                                             // 0 .. 100 %
+function axes(svg, dark) {
+  const g = S('g', {}, svg);
+  for (const a of [0, 25, 50, 75, 100]) { S('line', { x1: 240, x2: 1420, y1: LY(a), y2: LY(a), class: 'grid' }, g); S('text', { x: 222, y: LY(a) + 7, 'text-anchor': 'end', class: 'ax' }, g).textContent = a + '%'; }
+  for (const [r, s] of [[100, '100'], [250, '250'], [500, '500'], [1000, '1,000'], [2000, '2,000'], [4000, '4,000'], [9493, '9,493']]) S('text', { x: LX(r), y: 866, 'text-anchor': 'middle', class: 'ax' }, g).textContent = s;
+  S('text', { x: 830, y: 900, 'text-anchor': 'middle', class: 'axl' }, g).textContent = 'LABELLED TRAINING MESSAGES (LOG SCALE)';
+  return g;
+}
+// A polyline revealed up to point index u (fractional).
+function partial(pts, u) {
+  const n = Math.floor(u), f = u - n, out = pts.slice(0, Math.min(pts.length, n + 1));
+  if (n + 1 < pts.length && f > 0) out.push([lerp(pts[n][0], pts[n + 1][0], f), lerp(pts[n][1], pts[n + 1][1], f)]);
+  return out.map(p => p.map(v => v.toFixed(2)).join(',')).join(' ');
+}
+// piecewise-linear map from time to progress: keys = [[t, u], ...]
+function keyed(t, keys) {
+  if (t <= keys[0][0]) return keys[0][1];
+  for (let i = 1; i < keys.length; i++) if (t < keys[i][0]) { const x = E.inOut(P(t, keys[i - 1][0], keys[i][0])); return lerp(keys[i - 1][1], keys[i][1], x); }
+  return keys[keys.length - 1][1];
+}
+
+/* ================= 7. curve ================= */
+{
+  const svg = $('#cv-svg'), ax = axes(svg);
+  const others = Object.entries(CURVES).filter(([k]) => k !== 'Ettin 17M');
+  const shades = ['#c9b458', '#7fb8a2', '#5aa58a', '#8aa7c9', '#5b7fae', '#c98fa6'];
+  const O = others.map(([k, pts], i) => ({ k, pts: pts.map(([r, a]) => [LX(r), LY(a)]), last: pts[pts.length - 1][1], line: S('polyline', { fill: 'none', stroke: shades[i], 'stroke-width': 3, 'stroke-linejoin': 'round', opacity: 0 }, svg) }));
+  const main = CURVES['Ettin 17M'].map(([r, a]) => [LX(r), LY(a)]);
+  const mline = S('polyline', { fill: 'none', stroke: 'var(--green)', 'stroke-width': 6, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, svg);
+  const dots = main.map((p, i) => { const g = S('g', {}, svg); S('circle', { cx: p[0], cy: p[1], r: 9, fill: 'var(--green)', stroke: '#fff', 'stroke-width': 3 }, g); if (i < main.length - 1) { const tx = S('text', { x: p[0] + 16, y: p[1] + 34, class: 'ptl', fill: 'var(--green)' }, g); tx.textContent = CURVES['Ettin 17M'][i][1].toFixed(1); } return g; });
+  // end labels, spaced out and sorted
+  const all = [...O.map(o => ({ k: o.k, v: o.last, c: shades[O.indexOf(o)], y0: LY(o.last) })), { k: 'Ettin 17M', v: 91.5, c: 'var(--green)', y0: LY(91.5) }].sort((a, b) => b.v - a.v);
+  const lab = all.map((a, i) => { const g = S('g', { opacity: 0 }, svg); const y = 296 + i * 36; S('path', { d: `M1430 ${a.y0} L1450 ${y - 7}`, stroke: a.c, 'stroke-width': 2, fill: 'none' }, g); const tx = S('text', { x: 1462, y, class: 'endl', fill: a.c === 'var(--green)' ? 'var(--green)' : '#2c3a32' }, g); tx.innerHTML = `<tspan style="font:800 22px var(--mono)" fill="${a.c}">${a.v.toFixed(1)}</tspan>  ${a.k}`; return { g, main: a.k === 'Ettin 17M' }; });
+  const keys = [[at('d3', 'A hundred') - .2, 0], [at('d3', 'A thousand') - .3, 3], [at('d3', 'Two thousand') - .3, 4], [at('d3', 'Four thousand') - .3, 5], [L.d3.b + .3, 6]];
+  RUN.curve = t => {
+    const s0 = SCENES.curve[0];
+    const bigOut = L.d2.a - .3;
+    show($('#cv-b1'), t, s0 + .3, { dy: 20, out: bigOut, od: .4 });
+    show($('#cv-b2'), t, at('d1', 'The labels') - .1, { dy: 20, out: bigOut, od: .4 });
+    show($('#cv-head'), t, L.d2.a, { dy: 20 });
+    ax.setAttribute('opacity', P(t, L.d2.a, L.d2.a + .6));
+    $('#cv-foot').style.opacity = P(t, L.d2.a, L.d2.a + .6);
+    const u = t < keys[0][0] ? -1 : keyed(t, keys);
+    mline.setAttribute('points', u < 0 ? '' : partial(main, u));
+    dots.forEach((d, i) => d.setAttribute('opacity', u >= i - .02 ? P(t, 0, 1) * 1 : 0));
+    const T4 = L.d4.a;
+    O.forEach((o, i) => { const p = P(t, T4 + i * .12, T4 + 1.2 + i * .12); o.line.setAttribute('points', partial(o.pts, 6 * E.inOut(p))); o.line.setAttribute('opacity', p > 0 ? .9 : 0); });
+    lab.forEach((l, i) => l.g.setAttribute('opacity', l.main ? P(t, L.d3.b, L.d3.b + .5) : P(t, T4 + 1, T4 + 1.6)));
+  };
+}
+
+/* ================= 8. distill ================= */
+{
+  const svg = $('#ds-svg');
+  const MS = [['Where is my new card?', 'card_arrival'], ['I lost my card yesterday', 'lost_or_stolen_card'], ['Atm took my card', 'card_swallowed'], ['Refund still not showing', 'Refund_not_…'], ['Do you have a top-up limit?', 'top_up_limits'], ['How do I delete my account?', 'terminate_acc…']];
+  const cards = MS.map((m, i) => { const c = el('div', 'lcard', $('#ds-cards'), `${m[0]}<b>?</b>`, { left: '140px', width: '520px', top: 290 + i * 68 + 'px' }); return { c, b: c.querySelector('b'), lab: m[1] }; });
+  const p1 = S('path', { d: 'M670 500 C 720 500, 730 480, 780 480', stroke: '#b9c7be', 'stroke-width': 4, fill: 'none', 'stroke-dasharray': '2 10', 'stroke-linecap': 'round' }, svg);
+  const p2 = S('path', { d: 'M1140 480 C 1300 480, 1360 480, 1500 480', stroke: 'var(--green)', 'stroke-width': 5, fill: 'none' }, svg);
+  const p2len = p2.getTotalLength(); p2.setAttribute('stroke-dasharray', p2len);
+  const parts = Array.from({ length: 14 }, (_, i) => S('circle', { r: 7, fill: i % 2 ? 'var(--green)' : '#9fb3a7' }, svg));
+  const provs = ['Fireworks', 'Together', 'Parasail', 'DeepInfra'].map((p, i) => el('div', 'prov', $('#ds-provs'), p, { left: [760, 1030, 740, 1040][i] + 'px', top: [262, 262, 672, 672][i] + 'px' }));
+  const stats = [['9,493', 'labels'], ['28 s', 'to label them all'], ['$14', 'total cost'], ['4', 'providers at once']].map((s, i) => { const d = el('div', 'stat', $('#ds-stats'), `<div class="v">${s[0]}</div><div class="k">${s[1]}</div>`, { left: 140 + i * 420 + 'px' }); return d; });
+  const TL0 = at('t2', 'to label') - .3, TTR = at('t2', 'Then train'), TW = at('t2', 'distillation') - .2;
+  const TP = at('t3', 'four providers'), TS = [at('t3', 'all nine'), at('t3', 'twenty-eight'), at('t3', 'fourteen'), at('t3', 'four providers')];
+  const TT = L.t4.a - .1, TT1 = at('t4', 'Kimi’s allow'), TT2 = at('t4', 'Opus'), TT3 = at('t4', 'Jev');
+  RUN.distill = t => {
+    cards.forEach((c, i) => { show(c.c, t, L.t1.a + .8 + i * .1, { dy: 0, dx: -30, d: .5 }); const on = t > TL0 + i * .35; c.b.textContent = on ? c.lab : '?'; c.b.className = on ? 'on' : ''; });
+    show($('#ds-teacher'), t, L.t2.a, { dy: 0, s: .2, d: .7, ease: E.back });
+    p1.setAttribute('opacity', P(t, L.t2.a, L.t2.a + .5));
+    const sp = E.inOut(P(t, TTR, TTR + .9)); p2.setAttribute('stroke-dashoffset', p2len * (1 - sp));
+    show($('#ds-student'), t, TTR + .5, { dy: 0, s: .3, d: .6, ease: E.back });
+    show($('#ds-word'), t, TW, { dy: 16 });
+    // particles: messages into the teacher, then labels into the student
+    parts.forEach((c, i) => {
+      const ph = ((t - L.t2.a) * .7 + i / parts.length) % 1;
+      const second = i % 2 === 1;
+      const live = second ? t > TTR + .8 : t > L.t2.a + .4;
+      const fade = 1 - P(t, TT - .3, TT + .2);
+      const [x, y] = second ? [lerp(1140, 1500, ph), 480] : [lerp(670, 780, ph), lerp(500, 480, ph)];
+      c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('opacity', live ? (Math.sin(Math.PI * ph) * fade).toFixed(3) : 0);
+    });
+    provs.forEach((p, i) => show(p, t, TP + i * .12, { dy: 10, d: .4, s: .2, ease: E.back }));
+    stats.forEach((s, i) => show(s, t, TS[i] - .2, { dy: 20, d: .5 }));
+    $('#ds-stats').style.opacity = 1 - P(t, TT - .3, TT + .1);
+    const back = 1 - .88 * E.inOut(P(t, TT - .2, TT + .4));
+    for (const s of ['#ds-teacher', '#ds-student', '#ds-word']) $(s).style.opacity = (+$(s).style.opacity * back).toFixed(4);
+    $('#ds-cards').style.opacity = back; $('#ds-provs').style.opacity = back; $('#ds-svg').style.opacity = back;
+    show($('#ds-terms'), t, TT, { dy: 40, d: .6 });
+    show($('#ds-t1'), t, TT1 - .2, { dy: 0, dx: -20, d: .4 }); show($('#ds-t2'), t, TT2 - .2, { dy: 0, dx: -20, d: .4 }); show($('#ds-t3'), t, TT3 - .2, { dy: 0, dx: -20, d: .4 });
+  };
+}
+
+/* ================= 9. ceiling ================= */
+{
+  const svg = $('#ce-svg'), ax = axes(svg);
+  const hu = CURVES['Ettin 17M'].map(([r, a]) => [LX(r), LY(a)]), ki = KIMI_CURVE.map(([r, a]) => [LX(r), LY(a)]);
+  const teach = S('line', { x1: 240, x2: 1420, y1: LY(81.6), y2: LY(81.6), stroke: 'var(--kimi)', 'stroke-width': 3, 'stroke-dasharray': '10 9' }, svg);
+  const tlab = S('text', { x: 250, y: LY(81.6) - 14, class: 'endl', fill: 'var(--kimi)' }, svg); tlab.innerHTML = '<tspan style="font:800 22px var(--mono)">81.6</tspan>  Kimi K3 itself, the teacher';
+  const ceil = S('text', { x: 720, y: LY(81.6) - 14, style: 'font:800 24px var(--mono)', fill: 'var(--kimi)' }, svg); ceil.textContent = 'the ceiling';
+  const lh = S('polyline', { fill: 'none', stroke: 'var(--human-ink)', 'stroke-width': 6, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, svg);
+  const lk = S('polyline', { fill: 'none', stroke: 'var(--distill-ink)', 'stroke-width': 6, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, svg);
+  const mk = (pts, fill, stroke) => pts.map(p => S('circle', { cx: p[0], cy: p[1], r: 9, fill, stroke, 'stroke-width': 2.5 }, svg));
+  const dh = mk(hu, 'var(--human)', '#6e7d12'), dk = mk(ki, 'var(--distill)', '#1f7a5a');
+  const eh = S('text', { x: 1470, y: LY(91.5) + 8, class: 'endl', fill: '#2c3a32' }, svg); eh.innerHTML = '<tspan style="font:800 30px var(--mono)" fill="#7d8e12">91.5</tspan>  taught by people';
+  const ek = S('text', { x: 1470, y: LY(79.5) + 22, class: 'endl', fill: '#2c3a32' }, svg); ek.innerHTML = '<tspan style="font:800 30px var(--mono)" fill="#1f8a64">79.5</tspan>  taught by Kimi';
+  const br = S('path', { d: `M1438 ${LY(91.5)} h16 V${LY(79.5)} h-16`, stroke: 'var(--jev-ink)', 'stroke-width': 3, fill: 'none' }, svg);
+  const brl = S('text', { x: 1470, y: (LY(91.5) + LY(79.5)) / 2 + 12, style: 'font:800 26px var(--mono)', fill: 'var(--jev-ink)' }, svg); brl.textContent = '12 points';
+  const T0 = L.c2.a - .2, TS = at('c2', 'Then the lines'), TE = TS + 2.2;
+  RUN.ceiling = t => {
+    ax.setAttribute('opacity', P(t, SCENES.ceiling[0] + .2, SCENES.ceiling[0] + .8));
+    const u = t < T0 ? -1 : keyed(t, [[T0, 0], [TS - .2, 2], [TE, 6]]);
+    lh.setAttribute('points', u < 0 ? '' : partial(hu, u)); lk.setAttribute('points', u < 0 ? '' : partial(ki, u));
+    dh.forEach((d, i) => d.setAttribute('opacity', u >= i - .02 ? 1 : 0)); dk.forEach((d, i) => d.setAttribute('opacity', u >= i - .02 ? 1 : 0));
+    const tk = at('c3', 'just under'); teach.setAttribute('opacity', P(t, tk - .3, tk + .2)); tlab.setAttribute('opacity', P(t, tk - .3, tk + .2));
+    eh.setAttribute('opacity', P(t, at('c3', 'reaches') - .2, at('c3', 'reaches') + .3)); ek.setAttribute('opacity', P(t, at('c3', 'stops at') - .2, at('c3', 'stops at') + .3));
+    const tc = at('c4', 'learns the teacher'); ceil.setAttribute('opacity', P(t, at('c4', 'A student') , at('c4', 'A student') + .5));
+    const tb = at('c4', 'Human labels break') - .2; br.setAttribute('opacity', P(t, tb, tb + .4)); brl.setAttribute('opacity', P(t, tb, tb + .4));
+    const w = 6 + 3 * Math.sin(Math.PI * P(t, tb, tb + 1.2)); lh.setAttribute('stroke-width', w.toFixed(2));
+  };
+}
+
+/* ================= 10. soft ================= */
+{
+  const bars = (host, rows) => rows.map(([n, p]) => { const r = el('div', 'pb', host, `<div class="n">${n}</div><div class="b"></div><div class="p">${p}%</div>`); return { r, b: r.querySelector('.b'), p }; });
+  const lb = bars($('#sf-lb'), [['card_arrival', 100], ['card_delivery_estimate', 0], ['lost_or_stolen_card', 0]]);
+  const rb = bars($('#sf-rb'), [['card_arrival', 77], ['card_delivery_estimate', 19], ['lost_or_stolen_card', 4]]);
+  const host = $('#sf-rows');
+  const row = (y, key) => {
+    const k = el('div', 'a', host, key, { left: '140px', right: '140px', top: y + 'px', font: '600 19px var(--mono)', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)', borderTop: '1px solid var(--line)', paddingTop: '16px' });
+    return k;
+  };
+  const k1 = row(480, 'Answers right'), k2 = row(620, 'Says it is sure  vs  actually right'), k3 = row(780, 'Right on its most confident half');
+  const v = (x, y, html, style) => el('div', 'a', host, html, Object.assign({ left: x + 'px', top: y + 'px', font: '800 56px var(--mono)' }, style || {}));
+  const a1 = v(140, 520, '77.2%'), a2 = v(1020, 520, '77.3%'), eq = v(880, 526, '=', { color: 'var(--faint)', font: '800 48px var(--mono)' });
+  // confidence meters: outline = claimed confidence, fill = actual accuracy
+  const meter = (x, conf, acc, bad) => {
+    const m = el('div', 'a', host, null, { left: x + 'px', top: '672px', width: '760px', height: '80px' });
+    const tr = el('div', 'a', m, null, { left: 0, top: '10px', width: '560px', height: '40px', borderRadius: '8px', background: 'rgba(20,32,26,.06)' });
+    const cf = el('div', 'a', tr, null, { left: 0, top: 0, bottom: 0, borderRadius: '8px', border: '3px solid ' + (bad ? 'var(--jev-ink)' : 'var(--kimi)'), background: bad ? 'rgba(243,134,161,.22)' : 'rgba(47,157,118,.12)' });
+    const ac = el('div', 'a', tr, null, { left: 0, top: 0, bottom: 0, borderRadius: '8px', background: 'var(--kimi)' });
+    const tx = el('div', 'a', m, `<b style="color:${bad ? 'var(--jev-ink)' : 'var(--kimi)'}">${conf}% sure</b> · ${acc}% right`, { left: 0, top: '58px', font: '600 22px var(--sans)', color: 'var(--ink2)' });
+    return { m, cf, ac, tx, conf, acc };
+  };
+  const mL = meter(140, 95, 77, true), mR = meter(1020, 85, 77, false);
+  const c1 = v(140, 820, '91%'), c2 = v(1020, 820, '96%', { color: 'var(--green)' });
+  const route = el('div', 'a', host, 'sure → keep it · unsure → ask a bigger model', { left: '1240px', top: '838px', font: '600 25px var(--sans)', color: 'var(--green)' });
+  RUN.soft = t => {
+    show($('#sf-q'), t, L.s1.a, { dy: 10 });
+    show($('#sf-l'), t, at('s1', 'copies') - .2, { dy: 20 }); show($('#sf-r'), t, at('s1', 'probabilities') - .2, { dy: 20 });
+    lb.forEach((b, i) => { b.b.style.width = (b.p * 3.2 * E.out(P(t, at('s1', 'copies'), at('s1', 'copies') + .8))).toFixed(2) + 'px'; });
+    rb.forEach((b, i) => { b.b.style.width = (b.p * 3.2 * E.out(P(t, at('s1', 'probabilities') + i * .1, at('s1', 'probabilities') + .8 + i * .1))).toFixed(2) + 'px'; });
+    const T2 = at('s2', 'accuracy') - .3;
+    show(k1, t, T2 - .2, { dy: 0 }); show(a1, t, T2, { dy: 16 }); show(a2, t, T2 + .15, { dy: 16 }); show(eq, t, T2 + .4, { dy: 0, s: .4 });
+    const T3 = at('s3', 'Trained on answers') - .2;
+    show(k2, t, L.s3.a - .1, { dy: 0 });
+    [mL, mR].forEach((m, i) => {
+      const t0 = i ? L.s3.b + .2 : T3;
+      show(m.m, t, t0, { dy: 10 });
+      m.cf.style.width = (m.conf / 100 * 560 * E.out(P(t, t0 + .2, t0 + 1))).toFixed(2) + 'px';
+      m.ac.style.width = (m.acc / 100 * 560 * E.out(P(t, t0 + .7, t0 + 1.5))).toFixed(2) + 'px';
+    });
+    show(k3, t, L.s4.a - .1, { dy: 0 }); show(c1, t, L.s4.a + .2, { dy: 16 }); show(c2, t, at('s4', 'ninety-six') - .2, { dy: 16, s: .15, ease: E.back });
+    show(route, t, at('s4', 'Keep those') - .1, { dy: 12 });
+  };
+}
+
+/* ================= 11. general ================= */
+{
+  const svg = $('#gn-svg');
+  const Y = a => 820 - (a - 30) * 7.6, X = i => 280 + i * 160;
+  const g0 = S('g', {}, svg);
+  for (let a = 30; a <= 100; a += 10) { S('line', { x1: 200, x2: 1780, y1: Y(a), y2: Y(a), class: 'grid' }, g0); S('text', { x: 186, y: Y(a) + 7, 'text-anchor': 'end', class: 'ax' }, g0).textContent = a + '%'; }
+  const shape = { tri: (x, y, r) => `M${x} ${y - r * 1.1} L${x + r} ${y + r * .7} L${x - r} ${y + r * .7} Z`, dia: (x, y, r) => `M${x} ${y - r} L${x + r} ${y} L${x} ${y + r} L${x - r} ${y} Z` };
+  const cols = TASKS.map((tk, i) => {
+    const g = S('g', { opacity: 0 }, svg), x = X(i);
+    const band = S('rect', { x: x - 72, y: 280, width: 144, height: 610, rx: 14, fill: 'rgba(243,134,161,.13)', opacity: 0 }, g);
+    S('line', { x1: x, x2: x, y1: 290, y2: 820, stroke: '#dfe6e0', 'stroke-width': 2 }, g);
+    S('text', { x, y: 852, 'text-anchor': 'middle', class: 'tn' }, g).textContent = tk[0];
+    S('text', { x, y: 876, 'text-anchor': 'middle', class: 'tn2' }, g).textContent = tk[1];
+    const jev = S('path', { d: shape.dia(x, Y(tk[3]), 14), fill: 'var(--jev)', stroke: '#8a2f47', 'stroke-width': 2 }, svg);
+    const hum = S('path', { d: shape.tri(x, Y(tk[4]), 15), fill: 'var(--human)', stroke: '#4d5710', 'stroke-width': 2 }, svg);
+    const dis = S('circle', { cx: x, cy: Y(tk[5]), r: 13, fill: 'var(--distill)', stroke: '#1f7a5a', 'stroke-width': 2 }, svg);
+    const kim = S('circle', { cx: x, cy: Y(tk[2]), r: 10, fill: 'var(--kimi)', stroke: '#133f2f', 'stroke-width': 2 }, svg);
+    const gap = S('text', { x, y: 270, 'text-anchor': 'middle', class: 'gap', fill: tk[6] >= 0 ? 'var(--green)' : tk[6] > -5 ? '#7a8a80' : 'var(--jev-ink)' }, svg);
+    gap.textContent = (tk[6] > 0 ? '+' : tk[6] < 0 ? '−' : '') + Math.abs(tk[6]).toFixed(1);
+    return { g, band, jev, hum, dis, kim, gap, tk };
+  });
+  const hate = S('text', { x: X(8), y: Y(38), 'text-anchor': 'middle', style: 'font:700 20px var(--sans)', fill: 'var(--jev-ink)' }, svg); hate.innerHTML = '<tspan x="' + X(8) + '">test ≠</tspan><tspan x="' + X(8) + '" dy="24">training</tspan>';
+  const leg = $('#gn-leg');
+  const legRows = [['<svg width="30" height="30" style="position:static"><path d="M15 3 L28 15 L15 27 L2 15 Z" fill="#f386a1" stroke="#8a2f47" stroke-width="2"/></svg>', 'Jev (no training)'],
+    ['<svg width="30" height="30" style="position:static"><path d="M15 3 L29 26 L1 26 Z" fill="#E2F98A" stroke="#4d5710" stroke-width="2"/></svg>', 'Ettin 17M, human labels'],
+    ['<svg width="30" height="30" style="position:static"><circle cx="15" cy="15" r="12" fill="#A3E8D0" stroke="#1f7a5a" stroke-width="2"/></svg>', 'Ettin 17M, Kimi’s labels'],
+    ['<svg width="30" height="30" style="position:static"><circle cx="15" cy="15" r="9" fill="#2F9D76" stroke="#133f2f" stroke-width="2"/></svg>', 'Kimi K3 itself']].map(r => el('div', null, leg, r[0] + r[1]));
+  const count = $('#gn-count');
+  const T1 = L.g1.a, TJ = at('g1', 'same recipe'), TH = L.g2.a, TSix = at('g2', 'six'), TD = L.g3.a, TTie = at('g3', 'tied'), TFive = at('g3', 'five more');
+  const TK = L.g4.a, TWk = at('g4', 'weaker'), THate = at('g4', 'hate speech'), TEx = at('g4', 'Your examples');
+  RUN.general = t => {
+    legRows.forEach((r, i) => show(r, t, [TJ, TH, TD, TK][i], { dy: 0, dx: 16, d: .4 }));
+    cols.forEach((c, i) => {
+      c.g.setAttribute('opacity', P(t, T1 + i * .08, T1 + .5 + i * .08));
+      const pop = (e, t0) => { const p = E.back(P(t, t0, t0 + .45)); e.setAttribute('opacity', P(t, t0, t0 + .2)); e.setAttribute('transform', `translate(${X(i)} 0) scale(${Math.max(.001, p)} 1) translate(${-X(i)} 0)`); };
+      pop(c.jev, TJ + i * .07);
+      pop(c.hum, TH + i * .09);
+      const win = c.tk[4] > c.tk[3];
+      c.hum.setAttribute('stroke-width', t > TSix - .2 && win ? 4 : 2);
+      pop(c.dis, TD + i * .09);
+      pop(c.kim, TK + i * .06);
+      c.gap.setAttribute('opacity', P(t, TTie - .3 + i * .05, TTie + i * .05));
+      const lose = i >= 7; c.band.setAttribute('opacity', lose ? P(t, TWk - .2, TWk + .3) : 0);
+      const dim = t > TWk ? (lose ? 1 : .45 + .55 * (1 - P(t, TWk - .2, TWk + .3))) : 1;
+      [c.jev, c.hum, c.dis, c.kim, c.gap].forEach(e => e.style.filter = dim < 1 ? `opacity(${dim.toFixed(3)})` : '');
+    });
+    hate.setAttribute('opacity', P(t, THate - .1, THate + .4));
+    const lines = [];
+    if (t > TSix - .3) lines.push('<b style="color:#7d8e12">Human labels:</b> beat Jev on 6 of 10');
+    if (t > TTie - .3) lines.push('<b style="color:#1f8a64">Kimi’s labels:</b> tied Jev on 2, within 5 points on ' + (t > TFive - .3 ? '5 more' : '…'));
+    if (t > TEx - .3) lines.length = 0, lines.push('<b style="color:var(--jev-ink)">Your examples must look like your real data.</b>');
+    count.innerHTML = lines.join('<span style="color:var(--faint)">   ·   </span>');
+    count.style.opacity = t > TEx - .3 ? P(t, TEx - .3, TEx) : P(t, TSix - .3, TSix);
+  };
+}
+
+/* ================= 12. pays ================= */
+{
+  const svg = $('#py-svg');
+  const X = n => 240 + n / 1e6 * 1260, Y = d => 830 - d * 11.6;
+  const g0 = S('g', {}, svg);
+  for (const d of [0, 10, 20, 30, 40]) { S('line', { x1: 240, x2: 1500, y1: Y(d), y2: Y(d), class: 'grid' }, g0); S('text', { x: 222, y: Y(d) + 7, 'text-anchor': 'end', class: 'ax' }, g0).textContent = '$' + d; }
+  for (const [n, s] of [[0, '0'], [250e3, '250k'], [500e3, '500k'], [750e3, '750k'], [1e6, '1M']]) S('text', { x: X(n), y: 864, 'text-anchor': 'middle', class: 'ax' }, g0).textContent = s;
+  S('text', { x: 870, y: 900, 'text-anchor': 'middle', class: 'axl' }, g0).textContent = 'MESSAGES CLASSIFIED';
+  S('text', { x: 240, y: 300, class: 'axl' }, g0).textContent = 'TOTAL COST';
+  const band = S('rect', { x: X(54754), y: 300, width: X(503812) - X(54754), height: 530, fill: 'rgba(22,155,115,.08)', opacity: 0 }, svg);
+  const bandL = S('text', { x: (X(54754) + X(503812)) / 2, y: 340, 'text-anchor': 'middle', style: 'font:700 21px var(--sans)', fill: '#1f8a64', opacity: 0 }, svg); bandL.textContent = 'break-even across the ten tasks: 55k – 504k';
+  const up = 14.34 + 43.5 / 3600 * .12;
+  const ett = S('path', { d: `M${X(0)} ${Y(up)} L${X(1e6)} ${Y(up + .002)}`, stroke: 'var(--green)', 'stroke-width': 6, fill: 'none', 'stroke-linecap': 'round' }, svg);
+  const jev = S('path', { d: `M${X(0)} ${Y(0)} L${X(1e6)} ${Y(43.12)}`, stroke: 'var(--jev-ink)', 'stroke-width': 6, fill: 'none', 'stroke-linecap': 'round' }, svg);
+  [ett, jev].forEach(p => { const l = p.getTotalLength(); p.setAttribute('stroke-dasharray', l); p._l = l; });
+  const eL = S('text', { x: X(1e6) + 16, y: Y(up) + 8, style: 'font:800 26px var(--mono)', fill: 'var(--green)' }, svg); eL.innerHTML = 'Ettin <tspan style="font:500 21px var(--sans)" fill="#2c3a32">$14 once</tspan>';
+  const jL = S('text', { x: X(1e6) + 16, y: Y(43.12) + 8, style: 'font:800 26px var(--mono)', fill: 'var(--jev-ink)' }, svg); jL.innerHTML = 'Jev <tspan style="font:500 21px var(--sans)" fill="#2c3a32">$43 / million</tspan>';
+  const up1 = S('text', { x: X(0) + 14, y: Y(up) - 18, style: 'font:600 21px var(--sans)', fill: '#2c3a32' }, svg); up1.textContent = 'up front: Kimi labels $14.34 + training 44 s, then almost free';
+  const bx = 332610, cross = S('g', {}, svg);
+  S('circle', { cx: X(bx), cy: Y(up), r: 12, fill: '#fff', stroke: '#14201a', 'stroke-width': 4 }, cross);
+  S('line', { x1: X(bx), x2: X(bx), y1: Y(up) + 14, y2: 830, stroke: '#14201a', 'stroke-width': 2, 'stroke-dasharray': '5 6' }, cross);
+  const cl = S('text', { x: X(bx) + 20, y: Y(up) + 44, style: 'font:800 24px var(--mono)', fill: '#14201a' }, cross); cl.textContent = 'pays back at 333k (banking77)';
+  const zJ = S('text', { x: X(27000), y: 262, style: 'font:800 32px var(--mono)', fill: 'var(--jev-ink)' }, svg); zJ.textContent = '← use Jev';
+  const zF = S('text', { x: X(1e6), y: 262, 'text-anchor': 'end', style: 'font:800 32px var(--mono)', fill: 'var(--green)' }, svg); zF.textContent = 'fine-tune →';
+  const chips = ['speed', 'privacy', 'no internet'].map((c, i) => el('div', 'chip', $('#py-chips'), c, { left: 1540 + 'px', top: 420 + i * 72 + 'px', borderColor: 'var(--green)', color: '#0f6e51' }));
+  const T2 = at('p2', 'labels cost') - .3, T3 = L.p3.a - .1, TX = at('p3', 'pays back'), TB = at('p3', 'fifty'), T4 = L.p4.a, TF = at('p4', 'Above'), TC = at('p4', 'speed');
+  RUN.pays = t => {
+    g0.setAttribute('opacity', P(t, SCENES.pays[0] + .2, SCENES.pays[0] + .8));
+    ett.setAttribute('stroke-dashoffset', ett._l * (1 - E.inOut(P(t, T2, T2 + 1.4)))); eL.setAttribute('opacity', P(t, T2 + 1.2, T2 + 1.6));
+    up1.setAttribute('opacity', P(t, T2 + .2, T2 + .7) * (1 - P(t, TB - .2, TB + .2)));
+    jev.setAttribute('stroke-dashoffset', jev._l * (1 - E.inOut(P(t, T3, T3 + 1.6)))); jL.setAttribute('opacity', P(t, T3 + 1.4, T3 + 1.8));
+    cross.setAttribute('opacity', P(t, TX, TX + .4));
+    band.setAttribute('opacity', P(t, TB - .2, TB + .4)); bandL.setAttribute('opacity', P(t, TB, TB + .4));
+    zJ.setAttribute('opacity', P(t, T4, T4 + .4)); zF.setAttribute('opacity', P(t, TF - .1, TF + .3));
+    chips.forEach((c, i) => show(c, t, TC - .1 + i * .35, { dy: 12, d: .4, s: .1, ease: E.back }));
+  };
+}
+
+/* ================= 13. twist ================= */
+{
+  const dia = $('#tw-dia'), svg = $('#tw-svg');
+  const pile = el('div', 'a', dia, null, { left: '810px', top: '380px', width: '300px', height: '260px' });
+  for (let i = 0; i < 5; i++) el('div', 'a', pile, null, { left: i * 6 + 'px', top: 40 - i * 10 + 'px', width: '280px', height: '170px', borderRadius: '16px', background: i === 4 ? '#223029' : '#1b2721', border: '1px solid #33443b' });
+  el('div', 'a', pile, '<div style="font:800 34px var(--mono);color:#eef4f0">examples</div><div style="font:500 22px var(--sans);color:#93a69b;margin-top:8px">with known answers</div>', { left: '48px', top: '60px' });
+  const lA = S('path', { d: 'M800 500 L560 500', stroke: 'var(--jev)', 'stroke-width': 5, fill: 'none', 'marker-end': '' }, svg);
+  const lB = S('path', { d: 'M1130 500 L1370 500', stroke: '#62d3a8', 'stroke-width': 5, fill: 'none' }, svg);
+  [lA, lB].forEach(p => { const l = p.getTotalLength(); p.setAttribute('stroke-dasharray', l); p._l = l; });
+  const bA = el('div', 'a', dia, '<div style="font:800 40px var(--mono);color:var(--jev)">check Jev</div><div style="font:500 22px var(--sans);color:#93a69b;margin-top:8px">is it good enough?</div>', { left: '240px', top: '460px', width: '300px', textAlign: 'right' });
+  const bB = el('div', 'a', dia, '<div style="font:800 40px var(--mono);color:#62d3a8">train Ettin</div><div style="font:500 22px var(--sans);color:#93a69b;margin-top:8px">the same labels</div>', { left: '1390px', top: '460px', width: '320px' });
+  const cap = el('div', 'a', dia, 'The labels you need to evaluate are the labels you need to train.', { left: 0, right: 0, top: '760px', textAlign: 'center', font: 'italic 400 46px var(--serif)', color: '#eef4f0' });
+  RUN.twist = t => {
+    const TQ = L.x1.a, TD = L.x2.a, TX3 = L.x3.a, TX4 = L.x4.a;
+    show($('#tw-quote'), t, TQ - .1, { dy: 24, d: .8, out: TD + 1.5, od: .5 });
+    const dOut = TX4 - .4;
+    show(pile, t, TD + 1.9, { dy: 20, out: dOut }); lA.setAttribute('stroke-dashoffset', lA._l * (1 - E.inOut(P(t, at('x2', 'to check') - .6, at('x2', 'to check'))))); show(bA, t, at('x2', 'to check') - .1, { dy: 0, dx: 20, out: dOut });
+    lB.setAttribute('stroke-dashoffset', lB._l * (1 - E.inOut(P(t, TX3 + .6, TX3 + 1.3)))); show(bB, t, TX3 + 1.1, { dy: 0, dx: -20, out: dOut });
+    const lo = 1 - P(t, dOut, dOut + .45); lA.setAttribute('opacity', lo); lB.setAttribute('opacity', lo);
+    show(cap, t, at('x3', 'training your own') - .2, { dy: 16, out: dOut });
+    show($('#tw-py'), t, TX4, { dy: 40 }); show($('#tw-rs'), t, at('x4', 'fine-tuned') - .1, { dy: 40 });
+    show($('#tw-line'), t, at('x4', 'Start in') - .1, { dy: 16 });
+  };
+}
+
+/* ================= 14. recipe ================= */
+{
+  const ST = [['Write your categories', '', 'a few minutes', at('k2', 'Write')], ['Take 2,000 real messages', '', 'your own data', at('k2', 'Take')],
+    ['Label them', ' · people, or an allowed teacher', '$1–30 · seconds', at('k2', 'Have people')], ['Keep a few hundred aside', ' · checked by a person: your test', '200+ messages', L.k3.a],
+    ['Fine-tune Ettin-17M', '', '1 min GPU · 10 min laptop', L.k4.a], ['Compare with Jev and a frontier model', ' · keep the winner', 'on your test', at('k4', 'Compare')],
+    ['Messages changed?', ' · label a few more, train again', '1 minute', L.k5.a]];
+  const R = ST.map((s, i) => { const d = el('div', 'step', $('#rc-steps'), `<div class="n">${i + 1}</div><div class="x">${s[0]}<span>${s[1]}</span></div><div class="m">${s[2]}</div>`, { top: 250 + i * 94 + 'px' }); return { d, t: s[3] - .2 }; });
+  el('div', 'a', $('#rc-steps'), null, { left: '140px', width: '1640px', top: 250 + 7 * 94 + 'px', borderTop: '1px solid var(--line)' });
+  RUN.recipe = t => {
+    let cur = -1; R.forEach((r, i) => { show(r.d, t, r.t, { dy: 0, dx: -30, d: .5 }); if (t >= r.t) cur = i; });
+    R.forEach((r, i) => { const on = i === cur && t < L.k5.b + .3 ? P(t, r.t, r.t + .3) : 0; r.d.style.background = `rgba(22,155,115,${(.1 * on).toFixed(3)})`; });
+  };
+}
+
+/* ================= 15. close ================= */
+RUN.close = t => {
+  show($('#cl-a'), t, L.z1.a - .1, { dy: 30, d: .7 });
+  show($('#cl-b'), t, at('z1', 'Fine-tune') - .1, { dy: 30, d: .7 });
+  show($('#cl-by'), t, L.z1.b + .5, { dy: 16, d: .8 });
+};
+
+
+/* ================= captions ================= */
+// Written words, timed from Kokoro's own word timings (work/vo/words.js).
+// A line's written text can differ from what is spoken (91.5% / "ninety-one and a half percent"), so
+// text and speech are matched phrase by phrase (split at punctuation); inside a phrase, word by word
+// when the counts agree, by length otherwise.
+const CAPS = (() => {
+  const chunks = [], PUNCT = /^[,.:;?!…]+$/;
+  for (const sc of SCRIPT) {
+    if (sc.id === 'close') continue;                       // the closing words are already on screen
+    for (const ln of sc.lines) {
+      const T0 = L[ln.id].a, toks = (WORDS[ln.id] || []);
+      const sp = [[]]; for (const tk of toks) { if (PUNCT.test(tk[0])) { if (sp[sp.length - 1].length) sp.push([]); } else sp[sp.length - 1].push(tk); }
+      if (!sp[sp.length - 1].length) sp.pop();
+      let wp = ln.text.split(/(?<=[,.:;?!])\s+/).map(p => p.split(/\s+/).filter(Boolean));
+      let spans = sp;
+      if (wp.length !== sp.length) { wp = [wp.flat()]; spans = [sp.flat()]; }
+      const words = [];
+      wp.forEach((ws, k) => {
+        const tk = spans[k], a = tk[0][1], b = tk[tk.length - 1][2];
+        if (ws.length === tk.length) ws.forEach((w, i) => words.push({ w, a: T0 + tk[i][1], b: T0 + tk[i][2] }));
+        else {
+          const tot = ws.reduce((s, w) => s + w.length + 1, 0); let acc = 0;
+          ws.forEach(w => { const x0 = acc / tot; acc += w.length + 1; words.push({ w, a: T0 + a + (b - a) * x0, b: T0 + a + (b - a) * acc / tot }); });
+        }
+      });
+      // chunks: one short line each; every sentence is cut into pieces of about equal length (no orphan words),
+      // preferring a cut after a comma
+      const len = ws => ws.reduce((s, x) => s + x.w.length + 1, 0) - 1;
+      const raw = [[]]; words.forEach(wd => { raw[raw.length - 1].push(wd); if (/[.?!]$/.test(wd.w)) raw.push([]); });
+      const sents = [];
+      for (const s of raw.filter(s => s.length)) { const p = sents[sents.length - 1]; if (p && len(p) + 1 + len(s) <= 30) p.push(...s); else sents.push(s); }
+      for (const s of sents) {
+        const n = Math.ceil(len(s) / 30), target = len(s) / n;
+        let cur = [];
+        s.forEach((wd, i) => {
+          const rest = len(s.slice(i));
+          const comma = /[,:;]$/.test(cur.length ? cur[cur.length - 1].w : '') && len(cur) >= target * .6 && rest >= 12;
+          if (cur.length && (comma || (len(cur) + 1 + wd.w.length > Math.max(target * 1.2, 16) && rest >= 10))) { chunks.push(cur); cur = []; }
+          cur.push(wd);
+        });
+        if (cur.length) chunks.push(cur);
+      }
+    }
+  }
+  return chunks.map((ws, i) => ({ ws, a: ws[0].a - .06, b: Math.min(ws[ws.length - 1].b + .45, chunks[i + 1] ? chunks[i + 1][0].a - .06 : 1e9), html: null }));
+})();
+let capShown = -1;
+function drawCaption(t) {
+  const el = $('#cap-in');
+  let k = -1; for (let i = 0; i < CAPS.length; i++) { if (CAPS[i].a <= t && t < CAPS[i].b) { k = i; break; } if (CAPS[i].a > t) break; }
+  if (k < 0) { el.style.visibility = 'hidden'; capShown = -1; return; }
+  const c = CAPS[k];
+  if (capShown !== k) { el.innerHTML = c.ws.map(w => `<b>${w.w}</b>`).join(' '); capShown = k; }
+  el.style.visibility = 'visible';
+  const bs = el.children;
+  c.ws.forEach((w, i) => { bs[i].style.color = t >= w.a && t < w.b + .08 ? '#6ff0bf' : t >= w.a ? '#ffffff' : 'rgba(255,255,255,.62)'; });
+  // fade only where speech starts after a pause, not between chunks that follow each other
+  const prev = CAPS[k - 1], joined = prev && c.a - prev.b < .05;
+  const next = CAPS[k + 1], joinedNext = next && next.a - c.b < .05;
+  el.style.opacity = ((joined ? 1 : P(t, c.a, c.a + .12)) * (joinedNext ? 1 : 1 - P(t, c.b - .15, c.b))).toFixed(3);
+}
+
+/* ================= frame ================= */
+function draw(t) {
+  for (const id of TL.order) {
+    const [a, b] = SCENES[id], node = $('#s-' + id);
+    const last = id === TL.order[TL.order.length - 1];
+    const o = (a === 0 ? 1 : P(t, a, a + OVERLAP)) * (last ? 1 : 1 - P(t, b - OVERLAP, b));
+    if (o <= 0 || t < a - .01 || t > b + .01) { node.style.visibility = 'hidden'; continue; }
+    node.style.visibility = 'visible'; node.style.opacity = o.toFixed(4);
+    RUN[id](t);
+  }
+  const p = $('#prog'); p.style.width = (1920 * t / DUR).toFixed(1) + 'px';
+  p.style.opacity = (P(t, SCENES.job[0], SCENES.job[0] + 1) * (1 - P(t, SCENES.close[0], SCENES.close[0] + .6)) * .85).toFixed(3);
+  drawCaption(t);
+  $('#veil').style.opacity = P(t, DUR - 1.2, DUR - .05);
+}
+async function render(t) { draw(t); return 1; }
+async function ready() {
+  await Promise.all(['800 20px JB', '600 20px JB', '500 20px JB', '400 20px Inter', '500 20px Inter', '600 20px Inter', '700 20px Inter', '400 20px News', 'italic 400 20px News'].map(f => document.fonts.load(f)));
+  await document.fonts.ready;
+  return true;
+}
+if (location.search.includes('dumpcaps')) document.title = JSON.stringify(CAPS.map(c => [c.a.toFixed(2), c.b.toFixed(2), c.ws.map(w => w.w).join(' ')]));
+window.render = render; window.ready = ready(); window.DURATION = DUR;
+if (!navigator.webdriver && !location.search.includes('capture')) {
+  const q = new URLSearchParams(location.search); const t0 = parseFloat(q.get('t') || '0'); let start;
+  const fit = () => { const s = Math.min(innerWidth / 1920, innerHeight / 1080); $('#stage').style.transform = `scale(${s})`; $('#stage').style.transformOrigin = '0 0'; };
+  addEventListener('resize', fit); fit();
+  window.ready.then(() => { const tick = now => { start ??= now; render((t0 + (now - start) / 1000) % DUR).then(() => requestAnimationFrame(tick)); }; requestAnimationFrame(tick); });
+}
+</script>
+</body>
+</html>

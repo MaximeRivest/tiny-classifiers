@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# web PAGE [QUERY]  clear PAGE's log, open http://localhost:8771/PAGE on the phone's screen
+# web log PAGE      show what the page has reported so far
+cd "$(dirname "$0")/../web" || exit 1
+ADB=${ADB:-adb}                       # set ANDROID_SERIAL if several devices are connected
+if [ "$1" = log ]; then cat "logs/${2%.html}.log" 2>/dev/null; exit; fi
+if ! curl -s -m 2 -o /dev/null localhost:8771/serve.py; then
+    (setsid nohup python3 serve.py 8771 > /tmp/ettin-web.log 2>&1 & echo $! > /tmp/ettin-web.pid)
+    sleep 1
+fi
+timeout 10 "$ADB" reverse tcp:8771 tcp:8771 > /dev/null
+: > "logs/${1%.html}.log"
+timeout 10 "$ADB" shell am start -a android.intent.action.VIEW \
+    -d "'http://localhost:8771/$1?t=$(date +%s)${2:+&$2}'" com.android.chrome > /dev/null && echo "opened $1"

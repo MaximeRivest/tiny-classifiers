@@ -1,0 +1,1 @@
+{"device":"Galaxy S21 Ultra, Adreno 660 GPU (WebGPU, Chrome)","seed":0,"train_rows":9493,"steps":1782,"accuracy":0.9142,"top3":0.9701,"epoch_seconds":[217.52,210.29,210.81,212.19,214.72,211.85],"test_rows_per_s":183,"one_message_ms_p50":38.7,"one_message_ms_p90":41.4,"timings_s":{"load":0.25,"train":1277.4,"evaluate_3076":16.81,"latency_test":10.24},"total_wall_s":1304.93}

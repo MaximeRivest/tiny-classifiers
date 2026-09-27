@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+data/
+runs/
+labels/
+models/
+phone/web/data/
+phone/web/logs/
+phone/prep/ettin-17m/
+video/work/
+video/out/
+video/node_modules/
+keys.env

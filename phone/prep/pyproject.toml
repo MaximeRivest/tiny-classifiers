@@ -1,0 +1,13 @@
+[project]
+name = "ettin-laptop"
+version = "0"
+requires-python = ">=3.12,<3.13"
+dependencies = ["torch==2.13.*", "transformers==5.6.*"]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }

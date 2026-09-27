@@ -1,0 +1,120 @@
+<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width"><title>Ettin-17M phone training</title>
+<body style="background:#111;color:#ddd;font:12px monospace"><pre id=o style="white-space:pre-wrap"></pre>
+<script type=module>
+// Ettin-17M on banking77 human labels, the cpu_train.py recipe (--group-length variant) on the phone GPU:
+// 9,493 rows, batch 32, AdamW lr 1e-4 wd 0.01, 5% warmup then cosine, clip 1.0, 6 passes.
+//   ?bench=K   time K steps after warm-up and stop      ?epochs=E  ?seed=S
+import { init, defaultDevice, getWebGPUDevice, numpy as np, tree } from "./lib/jax/index.js";
+import * as E from "./ettin.js";
+const q = new URLSearchParams(location.search);
+const EPOCHS = +(q.get("epochs") ?? 6), SEED = +(q.get("seed") ?? 0), BENCH = +(q.get("bench") ?? 0);
+const BATCH = 32, LR = 1e-4, WARMUP = 0.05, INFLIGHT = +(q.get("inflight") ?? 2);
+const say = E.logger("train");
+const post = (obj) => fetch("/log/train_result", { method: "POST", body: JSON.stringify(obj) });
+const sec = (t) => +((performance.now() - t) / 1000).toFixed(2);
+try {
+  const tAll = performance.now(), timings = {};
+  try { await navigator.wakeLock.request("screen"); } catch (e) { say("no wake lock: " + e.message); }
+  await init("webgpu"); defaultDevice("webgpu");
+  const gpu = await getWebGPUDevice();
+  gpu.lost.then((i) => say(`GPU LOST: ${i.message}`));
+  let t = performance.now();
+  const data = await E.loadData();
+  let P = await E.loadWeights("data", data.vocab);
+  let M = E.zerosLike(P), V = E.zerosLike(P);
+  timings.load = sec(t);
+  const S = data.train, nTrain = S.y.length;
+  const steps = EPOCHS * Math.ceil(nTrain / BATCH), warm = Math.max(1, Math.floor(WARMUP * steps));
+  const lrAt = (s) => LR * (s < warm ? (s + 1) / warm : 0.5 * (1 + Math.cos(Math.PI * (s - warm) / (steps - warm))));
+  const rand = E.rng(SEED);
+  const epochBatches = () => {                         // shuffle, sort within chunks of 50 batches, shuffle batches
+    const order = E.shuffle([...Array(nTrain).keys()], rand), chunk = BATCH * 50, out = [];
+    for (let c = 0; c < nTrain; c += chunk) {
+      const part = order.slice(c, c + chunk).sort((a, b) => S.lengths[a] - S.lengths[b]);
+      for (let i = 0; i < part.length; i += BATCH) out.push(part.slice(i, i + BATCH));
+    }
+    return E.shuffle(out, rand);
+  };
+  say(`embedding rows ${data.vocab.length} of 50368; ${nTrain} train rows, ${steps} steps, warmup ${warm}; adapter ${gpu.adapterInfo?.architecture ?? ""}`);
+
+  let step = 0;
+  const doStep = (b) => {
+    const mb = E.makeBatch(data, "train", b, BATCH);
+    const out = E.trainStep(P, M, V, mb.batch, mb.yoh, mb.w, E.hyper(lrAt(step), step + 1));
+    P = out.P; M = out.M; V = out.V; out.gnorm.dispose(); step++;
+    return out.loss;
+  };
+
+  if (BENCH) {
+    const bs = epochBatches();
+    for (const [i, b] of bs.slice(0, 15).entries()) {  // compile the common lengths
+      const ts = performance.now(), l = (await doStep(b).data())[0];
+      say(`warm-up ${i + 1}: length ${E.bucket(Math.max(...b.map((j) => S.lengths[j])))}, loss ${l.toFixed(3)}, ${sec(ts)} s`);
+    }
+    t = performance.now();
+    const losses = []; let pend = [];
+    for (const [i, b] of bs.slice(15, 15 + BENCH).entries()) {
+      pend.push(doStep(b));
+      if (pend.length >= INFLIGHT) losses.push(await pend.shift().data());
+      if (i % 10 === 9) say(`bench step ${i + 1}: ${(sec(t) / (i + 1)).toFixed(3)} s/step; gpu ${JSON.stringify(globalThis.__jaxWebGPU?.memStats())}`);
+    }
+    for (const l of pend) losses.push(await l.data());
+    const per = (performance.now() - t) / 1000 / BENCH;
+    const r = { bench_steps: BENCH, sec_per_step: +per.toFixed(4), projected_train_min: +(per * steps / 60).toFixed(1),
+                last_loss: losses.at(-1)[0] };
+    say(JSON.stringify(r)); post(r); say("END");
+  } else {
+    t = performance.now();
+    const epochS = [];
+    for (let ep = 0; ep < EPOCHS; ep++) {
+      const te = performance.now(), bs = epochBatches();
+      let sum = 0, pend = [];
+      for (let i = 0; i < bs.length; i++) {
+        pend.push(doStep(bs[i]));                       // at most INFLIGHT steps queued: memory stays flat
+        if (pend.length >= INFLIGHT) sum += (await pend.shift().data())[0];
+        if (i % 50 === 49) say(`epoch ${ep + 1}: step ${i + 1}/${bs.length}, ${sec(te)} s; gpu ${JSON.stringify(globalThis.__jaxWebGPU?.memStats())}`);
+      }
+      for (const l of pend) sum += (await l.data())[0];
+      epochS.push(sec(te));
+      say(`EPOCH ${ep + 1}: loss ${(sum / bs.length).toFixed(4)}, ${epochS.at(-1)} s`);
+    }
+    timings.train = sec(t);
+
+    t = performance.now();                               // evaluate on the test messages
+    const T = data.test, nTest = T.y.length;
+    const order = [...Array(nTest).keys()].sort((a, b) => T.lengths[a] - T.lengths[b]);
+    let right = 0, top3 = 0;
+    for (let i = 0; i < nTest; i += 128) {
+      const idx = order.slice(i, i + 128), mb = E.makeBatch(data, "test", idx);
+      mb.yoh.dispose(); mb.w.dispose();
+      const p = await E.predict(tree.ref(P), mb.batch).data();
+      idx.forEach((row, r) => {
+        const pr = Array.from(p.slice(r * E.NLAB, (r + 1) * E.NLAB));
+        const best = pr.map((x, j) => [x, j]).sort((a, b) => b[0] - a[0]).slice(0, 3).map((x) => x[1]);
+        if (best[0] === T.y[row]) right++;
+        if (best.includes(T.y[row])) top3++;
+      });
+    }
+    timings.evaluate_3076 = sec(t);
+    const res = { device: "Galaxy S21 Ultra, Adreno 660 GPU (WebGPU, Chrome)", seed: SEED, train_rows: nTrain, steps,
+                  accuracy: +(right / nTest).toFixed(4), top3: +(top3 / nTest).toFixed(4), epoch_seconds: epochS,
+                  test_rows_per_s: Math.round(nTest / timings.evaluate_3076) };
+    say(`ACCURACY ${res.accuracy} top3 ${res.top3}`);
+
+    t = performance.now();                               // one message at a time
+    const lat = [];
+    for (let i = 0; i < 220; i++) {
+      const ts = performance.now(), mb = E.makeBatch(data, "test", [i]);
+      mb.yoh.dispose(); mb.w.dispose();
+      await E.predict(tree.ref(P), mb.batch).data();
+      lat.push(performance.now() - ts);
+    }
+    const ls = lat.slice(20).sort((a, b) => a - b);
+    res.one_message_ms_p50 = +ls[ls.length >> 1].toFixed(2);
+    res.one_message_ms_p90 = +ls[Math.floor(0.9 * ls.length)].toFixed(2);
+    timings.latency_test = sec(t);
+    res.timings_s = timings; res.total_wall_s = sec(tAll);
+    say(JSON.stringify(res)); await post(res); say("END");
+  }
+} catch (e) { say("ERROR " + (e.stack || e)); say("END"); }
+</script>

@@ -1,0 +1,36 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face{font-family:'JB';src:url(fonts/JetBrainsMono.ttf) format('truetype');font-weight:100 800}
+@font-face{font-family:'Inter';src:url(fonts/inter-latin-wght-normal.woff2) format('woff2-variations');font-weight:100 900}
+*{box-sizing:border-box;margin:0}
+html,body{width:1280px;height:720px;overflow:hidden;background:#0b120f}
+#t{position:relative;width:1280px;height:720px;overflow:hidden;font-family:'Inter',sans-serif;color:#f2f7f3;
+  background:radial-gradient(ellipse 60% 70% at 22% 45%,rgba(40,190,140,.22),rgba(11,18,15,0) 70%),#0b120f}
+#big{position:absolute;left:56px;top:52px;font:800 330px/0.9 'JB',monospace;letter-spacing:-.06em;color:#62e0b0;
+  text-shadow:0 10px 50px rgba(98,224,176,.25)}
+#sub{position:absolute;left:66px;top:352px;font:800 78px/1.05 'JB',monospace;letter-spacing:-.04em}
+#sub em{font-style:normal;color:#62e0b0}
+#tag{position:absolute;left:66px;top:560px;font:800 34px 'Inter';background:#62e0b0;color:#0b120f;border-radius:14px;padding:12px 24px;transform:rotate(-2deg)}
+#card{position:absolute;right:44px;top:70px;width:520px;height:580px;background:#15201b;border:2px solid #26372f;border-radius:30px;padding:40px 38px;
+  box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.row{margin-bottom:46px}
+.nm{font:800 40px 'Inter';letter-spacing:-.01em;display:flex;align-items:baseline}
+.nm span{margin-left:auto;font:800 44px 'JB',monospace}
+.bar{height:44px;border-radius:10px;background:#26352e;margin-top:14px;position:relative;overflow:hidden}
+.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:10px}
+.cost{font:600 30px 'Inter';color:#9fb2a7;margin-top:14px}
+.cost b{font:800 40px 'JB',monospace;color:#f2f7f3}
+.g .nm span,.g .cost b{color:#62e0b0}
+#per{font:600 20px 'JB',monospace;letter-spacing:.14em;text-transform:uppercase;color:#6f857a;position:absolute;left:38px;bottom:34px}
+</style></head>
+<body><div id="t">
+  <div id="big">17M</div>
+  <div id="sub">trained in<br><em>42 seconds</em></div>
+  <div id="tag">Also trains on a laptop or phone</div>
+  <div id="card">
+    <div class="row"><div class="nm">Claude Opus<span>92%</span></div><div class="bar"><i style="width:92%;background:#6c7a72"></i></div><div class="cost"><b>$8,120</b> / 1M messages</div></div>
+    <div class="row g"><div class="nm">Tiny model<span>91.5%</span></div><div class="bar"><i style="width:91.5%;background:#1fb584"></i></div><div class="cost"><b>≈ $0</b> / 1M messages</div></div>
+    <div id="per">banking77 · % right · cost</div>
+  </div>
+</div></body></html>

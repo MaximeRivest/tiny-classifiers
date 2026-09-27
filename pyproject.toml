@@ -1,0 +1,18 @@
+[project]
+name = "tiny-classifiers"
+version = "0.1.0"
+description = "Fine-tune (or distill into) a 17M-parameter classifier in minutes, and know when it beats an API"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Maxime Rivest" }]
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "torch>=2.5",
+    "transformers>=4.48",
+    "aiohttp>=3.9",
+    "pandas>=2.2",
+    "pyarrow>=16",
+]
+
+[tool.uv]
+package = false

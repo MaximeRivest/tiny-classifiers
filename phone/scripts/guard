@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# guard [MIN_MB]: every 2 s log phone free memory + Chrome GPU/renderer RSS to web/logs/mem.log;
+# force-stop Chrome if free memory falls below MIN_MB (default 1500). Stops when ~/.ettin-guard-stop exists.
+ADB=${ADB:-adb}                         # set ANDROID_SERIAL if several devices are connected
+MIN=${1:-1500}; LOG="$(dirname "$0")/../web/logs/mem.log"; mkdir -p "$(dirname "$LOG")"; rm -f ~/.ettin-guard-stop; : > $LOG
+while [ ! -e ~/.ettin-guard-stop ]; do
+  line=$(timeout 8 $ADB shell 'a=$(grep MemAvailable /proc/meminfo | tr -s " " | cut -d" " -f2); g=$(for p in $(pidof com.android.chrome:privileged_process0); do grep VmRSS /proc/$p/status; done | tr -s " " | cut -d" " -f2); r=$(ps -A -o RSS,NAME | grep sandboxed_process0 | sort -n | tail -1 | tr -s " " | sed "s/^ //" | cut -d" " -f1); t=$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null); echo "$((a/1024)) $((${g:-0}/1024)) $((${r:-0}/1024)) $t"')
+  set -- $line
+  echo "$(date +%T) free ${1}MB gpu_proc ${2}MB renderer ${3}MB" >> $LOG
+  if [ -n "$1" ] && [ "$1" -lt "$MIN" ]; then timeout 8 $ADB shell am force-stop com.android.chrome; echo "$(date +%T) GUARD: free ${1}MB < ${MIN}MB, stopped Chrome" >> $LOG; fi
+  sleep 2
+done

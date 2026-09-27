@@ -1,0 +1,30 @@
+<!doctype html><meta charset=utf-8><title>buckets</title><pre id=o></pre>
+<script type=module>
+import { init, defaultDevice, jit, tree } from "./lib/jax/index.js";
+import * as E from "./ettin.js";
+const say = E.logger("buckets");
+const MODE = new URLSearchParams(location.search).get("mode") ?? "loss", DEVS = (new URLSearchParams(location.search).get("devs") ?? "webgpu,wasm").split(",");
+try {
+  await init("webgpu", "wasm");
+  const [data, ref] = await Promise.all([E.loadData(), fetch("data/buckets.json").then((r) => r.json())]);
+  const loss = jit(E.lossFn);
+  for (const dev of DEVS) {
+    defaultDevice(dev);
+    const P = await E.loadWeights("data", data.vocab);
+    for (const r of ref) {
+      const mb = E.makeBatch(data, "train", r.rows, 32);
+      let l;
+      if (MODE === "step") {
+        const o = E.trainStep(tree.ref(P), E.zerosLike(P), E.zerosLike(P), mb.batch, mb.yoh, mb.w, E.hyper(1e-4, 1));
+        l = (await o.loss.data())[0]; tree.dispose([o.P, o.M, o.V, o.gnorm]);
+      } else if (MODE === "grad") {
+        const [lo, G] = jit(E.lossAndGrad)(tree.ref(P), mb.batch, mb.yoh, mb.w);
+        l = (await lo.data())[0]; tree.dispose(G);
+      } else l = (await loss(tree.ref(P), mb.batch, mb.yoh, mb.w).data())[0];
+      say(`${MODE} ${dev} len ${mb.L}: loss ${l.toFixed(5)} vs ${r.loss.toFixed(5)} ${Math.abs(l - r.loss) > 1e-3 ? "  <-- WRONG" : "ok"}`);
+    }
+    tree.dispose(P);
+  }
+} catch (e) { say("ERROR " + (e.stack || e)); }
+say("END");
+</script>
